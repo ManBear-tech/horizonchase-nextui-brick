@@ -36,6 +36,7 @@ jobs:
         run: |
           sha256sum horizonchase-universal libastcUtil.so
           sha256sum package/dist/horizonchase.zip
+          (cd package/dist && sha256sum -c horizonchase.zip.sha256)
 
       - uses: actions/upload-artifact@v4
         with:
