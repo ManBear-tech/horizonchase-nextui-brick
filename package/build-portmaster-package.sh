@@ -281,7 +281,10 @@ mkdir -p -- "$(dirname -- "$OUTPUT")"
 OUTPUT_DIR=$(cd -- "$(dirname -- "$OUTPUT")" && pwd -P)
 OUTPUT="$OUTPUT_DIR/$(basename -- "$OUTPUT")"
 install -m 0644 -- "$TMP_ZIP" "$OUTPUT"
-sha256sum "$OUTPUT" > "$OUTPUT.sha256"
+(
+  cd -- "$OUTPUT_DIR"
+  sha256sum "$(basename -- "$OUTPUT")" > "$(basename -- "$OUTPUT").sha256"
+)
 
 printf 'OK: %s\n' "$OUTPUT"
 printf 'Loader: '
