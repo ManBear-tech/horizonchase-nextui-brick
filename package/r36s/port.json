@@ -1,0 +1,35 @@
+{
+    "version": 4,
+    "name": "horizonchase.zip",
+    "items": [
+        "Horizon Chase.sh",
+        "horizonchase"
+    ],
+    "items_opt": [],
+    "attr": {
+        "title": "Horizon Chase",
+        "porter": [
+            "NextOS"
+        ],
+        "desc": "Horizon Chase Android 2.6.9 through a native AArch64 Unity/IL2CPP so-loader. One loader negotiates Mali/fbdev, KMSDRM, GLES, compressed textures, audio and memory tiers at runtime. Includes native controllers, music/SFX, persistent saves and clean frontend exit. BYO-data; game files are not included.",
+        "inst": "Place a legal arm64 Horizon Chase Android 2.6.9 APK, all splits, or a complete APKS/APKM/XAPK bundle in horizonchase/gamedata and launch the port. NXExtract validates and prepares it automatically.",
+        "genres": [
+            "racing",
+            "arcade"
+        ],
+        "image": {
+            "screenshot": "screenshot.png",
+            "covers": [
+                "cover.png"
+            ],
+            "thumbnail": "cover.png",
+            "video": null
+        },
+        "rtr": false,
+        "runtime": [],
+        "reqs": [],
+        "arch": [
+            "aarch64"
+        ]
+    }
+}

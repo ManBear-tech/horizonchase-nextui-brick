@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  release-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install audit tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils build-essential unzip zip
+
+      - name: Test NXExtract
+        working-directory: third_party/NXExtract
+        run: ./tools/check-release.sh
+
+      - name: Test game-path helper
+        run: |
+          cc -std=gnu11 -Wall -Wextra -Isrc \
+            tests/game_path_test.c src/util.c -pthread \
+            -o /tmp/horizon-game-path-test
+          /tmp/horizon-game-path-test
+
+      - name: Build and audit the BYO-data package
+        run: ./package/build-portmaster-package.sh
+
+      - name: Record release hashes
+        run: |
+          sha256sum horizonchase-universal libastcUtil.so
+          sha256sum package/dist/horizonchase.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizonchase-portmaster
+          path: |
+            package/dist/horizonchase.zip
+            package/dist/horizonchase.zip.sha256
+          if-no-files-found: error

@@ -1,0 +1,41 @@
+# User-supplied proprietary game data
+/payload/
+/runtime-defaults/
+/gamedata/*
+!/package/universal/gamedata/README.txt
+/UnityDataAssetPack.apk
+/userdata/
+/bin/
+/Android/
+/libunity.so
+/libil2cpp.so
+/libmain.so
+*.apk
+*.apkm
+*.apks
+*.xapk
+*.obb
+
+# Local builds and release output
+/horizonchase
+/horizonchase-r36s
+/package/dist/
+*.tar
+*.tar.gz
+
+# Diagnostics and generated files
+/artifacts/
+/debug.log
+/run.out
+*.log
+*.raw
+*.ppm
+*.tombstone
+__pycache__/
+*.py[cod]
+
+# The audited universal loader, ASTC decoder and NXExtract UI are intentional
+# release inputs committed by this standalone repository.
+!/horizonchase-universal
+!/libastcUtil.so
+!/third_party/NXExtract/ui/build/nxextract-ui

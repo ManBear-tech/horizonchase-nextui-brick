@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "id": "meu-port",
+  "version": "1",
+  "title": "MEU NOVO PORT",
+  "abi_order": [
+    "arm64-v8a",
+    "armeabi-v7a"
+  ],
+  "input": {
+    "search_dirs": [
+      "gamedata",
+      "."
+    ],
+    "prefer_first_nonempty": true,
+    "sniff_all_in_primary": true
+  },
+  "extract": [
+    {
+      "id": "native-library",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/{abi}/libgame.so"
+        ]
+      },
+      "destination": "lib/{abi}/libgame.so",
+      "validate": {
+        "type": "file",
+        "elf_machine": "{abi}",
+        "min_size": 1
+      }
+    },
+    {
+      "id": "game-assets",
+      "source": {
+        "kind": "entries",
+        "patterns": [
+          "assets/**"
+        ],
+        "strip_prefix": "assets/"
+      },
+      "destination": "assets",
+      "validate": {
+        "type": "tree",
+        "min_files": 1,
+        "min_bytes": 1
+      }
+    }
+  ],
+  "validate": [
+    {
+      "path": "lib/{abi}/libgame.so",
+      "type": "file",
+      "elf_machine": "{abi}"
+    }
+  ],
+  "commit": [
+    "lib/{abi}/libgame.so",
+    "assets"
+  ],
+  "marker": ".nxextract-meu-port.json",
+  "space": {
+    "safety_bytes": 134217728
+  },
+  "log": "nxextract.log",
+  "ui_success_seconds": 1,
+  "ui_error_seconds": 5
+}

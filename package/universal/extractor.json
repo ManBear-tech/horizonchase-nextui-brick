@@ -1,0 +1,193 @@
+{
+  "schema": 1,
+  "id": "horizonchase",
+  "version": "2.6.9-1",
+  "title": "HORIZON CHASE",
+  "abi_order": [
+    "arm64-v8a"
+  ],
+  "input": {
+    "search_dirs": [
+      "gamedata",
+      "."
+    ],
+    "prefer_first_nonempty": true,
+    "sniff_all_in_primary": true,
+    "max_files": 128,
+    "max_bundle_apks": 128
+  },
+  "extract": [
+    {
+      "id": "libunity",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/{abi}/libunity.so"
+        ]
+      },
+      "destination": "libunity.so",
+      "validate": {
+        "type": "file",
+        "size": 25023704,
+        "sha256": "7c46972d06b6b85f953bf61b477fdbf5bf22f7be55b57e4b54b4403f05478359",
+        "elf_machine": "{abi}"
+      }
+    },
+    {
+      "id": "libil2cpp",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/{abi}/libil2cpp.so"
+        ]
+      },
+      "destination": "libil2cpp.so",
+      "validate": {
+        "type": "file",
+        "size": 47587688,
+        "sha256": "acf414c77853aa0e7f8d8963f307f65f3d156c8d6d806661b738df3385e48cdc",
+        "elf_machine": "{abi}"
+      }
+    },
+    {
+      "id": "libmain",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "lib/{abi}/libmain.so"
+        ]
+      },
+      "destination": "libmain.so",
+      "validate": {
+        "type": "file",
+        "size": 6728,
+        "sha256": "a2dfe24e0170af0ae90b13630fc6d4e788be2c5216b4bddb17a6e0ca3c4c5af8",
+        "elf_machine": "{abi}"
+      }
+    },
+    {
+      "id": "unity-data",
+      "source": {
+        "kind": "entries",
+        "patterns": [
+          "assets/bin/**"
+        ],
+        "strip_prefix": "assets/bin/"
+      },
+      "destination": "bin",
+      "validate": {
+        "type": "tree",
+        "exact_files": 27,
+        "exact_bytes": 150913990,
+        "required_paths": [
+          "Data/boot.config",
+          "Data/data.unity3d",
+          "Data/datapack.unity3d",
+          "Data/Managed/Metadata/global-metadata.dat"
+        ],
+        "tree_fingerprint": "d47284a353b1cb1411f42fafe18c6d260a389fe4b5798042723b09901066952a"
+      }
+    },
+    {
+      "id": "android-bundles",
+      "source": {
+        "kind": "entries",
+        "patterns": [
+          "assets/Android/**"
+        ],
+        "strip_prefix": "assets/Android/"
+      },
+      "destination": "Android",
+      "validate": {
+        "type": "tree",
+        "exact_files": 20,
+        "exact_bytes": 272852276,
+        "required_paths": [
+          "Android",
+          "music",
+          "trackassets",
+          "basegamesfx",
+          "misctextures"
+        ],
+        "tree_fingerprint": "cd20af2bbb5c25101fbed42f8eedfd0ea4c514ca2436d6e6cc795488955340dc"
+      }
+    },
+    {
+      "id": "unity-project-config",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "assets/UnityServicesProjectConfiguration.json"
+        ]
+      },
+      "destination": "UnityServicesProjectConfiguration.json",
+      "validate": {
+        "type": "file",
+        "size": 1804,
+        "sha256": "31886bb0104e52d208010109c443681bee261728053a18462230dd0452990510"
+      }
+    },
+    {
+      "id": "localization-table",
+      "source": {
+        "kind": "entry",
+        "patterns": [
+          "assets/hr.txt"
+        ]
+      },
+      "destination": "hr.txt",
+      "validate": {
+        "type": "file",
+        "size": 3198,
+        "sha256": "c8076dd0f3b22fec8d0ed56ef90aa2619f65c4d7168b2a7ff597300576e39fdc"
+      }
+    }
+  ],
+  "hooks": [
+    {
+      "id": "unity-asset-pack",
+      "argv": [
+        "python3",
+        "{game_dir}/tools/build_unity_asset_pack.py",
+        "{stage}/bin/Data/datapack.unity3d",
+        "{stage}/UnityDataAssetPack.apk"
+      ],
+      "cwd": "{game_dir}",
+      "checkpoint": [
+        {
+          "path": "UnityDataAssetPack.apk",
+          "type": "file",
+          "size": 81091398,
+          "sha256": "8b4f33d1809c60f515b0c2d667ed05236ee0c48cec0259734ce381f257192483",
+          "magic_ascii": "PK"
+        }
+      ]
+    }
+  ],
+  "validate": [
+    {
+      "path": "UnityDataAssetPack.apk",
+      "type": "file",
+      "size": 81091398,
+      "sha256": "8b4f33d1809c60f515b0c2d667ed05236ee0c48cec0259734ce381f257192483",
+      "magic_ascii": "PK"
+    }
+  ],
+  "commit": [
+    "libunity.so",
+    "libil2cpp.so",
+    "libmain.so",
+    "bin",
+    "Android",
+    "UnityServicesProjectConfiguration.json",
+    "hr.txt",
+    "UnityDataAssetPack.apk"
+  ],
+  "marker": ".nxextract-horizonchase.json",
+  "space": {
+    "safety_bytes": 268435456
+  },
+  "log": "nxextract.log",
+  "ui_success_seconds": 1,
+  "ui_error_seconds": 8
+}

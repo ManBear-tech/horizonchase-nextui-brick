@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a reproducible NXExtract failure using synthetic or redacted data.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not upload APKs, OBBs, game assets, credentials, private addresses or raw personal logs.
+        A minimal synthetic archive and a redacted log excerpt are enough.
+
+  - type: input
+    id: version
+    attributes:
+      label: NXExtract version
+      description: Run `python3 nxextract.py --version`.
+      placeholder: NXExtract 1.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device family and operating system
+      placeholder: R36S / ArkOS
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Architecture, glibc and Python
+      placeholder: AArch64, glibc 2.30, Python 3.7.5
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include the command and a minimal synthetic recipe/archive when possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Redacted log excerpt
+      render: text
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed game data, credentials, private addresses and personal paths.
+          required: true
+        - label: I confirmed that only one NXExtract instance was running.
+          required: true

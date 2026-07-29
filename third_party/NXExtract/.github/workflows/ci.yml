@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  release-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Build AArch64 compatibility UI
+        run: ./ui/build-ui.sh
+
+      - name: Run tests and release gates
+        run: ./tools/check-release.sh

@@ -1,0 +1,88 @@
+name: Device compatibility report
+description: Add a verified device result to the living compatibility matrix.
+title: "[Device] "
+labels:
+  - device-compatibility
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use only the synthetic fixture. Never include a private IP, hostname, credential or game data.
+
+  - type: input
+    id: version
+    attributes:
+      label: Exact NXExtract version or commit
+      placeholder: NXExtract 1.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Device family, OS and architecture
+      placeholder: R36S, ArkOS, AArch64
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: glibc and Python versions
+      placeholder: glibc 2.30, Python 3.7.5
+    validations:
+      required: true
+
+  - type: input
+    id: display
+    attributes:
+      label: SDL drivers, selected backend and visible resolution
+      placeholder: KMSDRM/offscreen, selected KMSDRM, 640x480
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Synthetic first install
+      options:
+        - Passed
+        - Failed
+    validations:
+      required: true
+
+  - type: dropdown
+    id: verify
+    attributes:
+      label: Full verify
+      options:
+        - Passed
+        - Failed
+    validations:
+      required: true
+
+  - type: dropdown
+    id: second
+    attributes:
+      label: Marker-based second run
+      options:
+        - Passed
+        - Failed
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Source-hash, cleanup and workaround notes
+      description: Confirm source preservation, no leftover process/transaction and restored frontend state.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Publication confirmation
+      options:
+        - label: This report contains no private address, credential, raw log or game data.
+          required: true

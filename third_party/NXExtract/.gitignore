@@ -1,0 +1,6 @@
+/build/
+/ui/build/
+/*.log
+/.device-test/
+__pycache__/
+*.pyc

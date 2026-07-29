@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<gameList>
+  <game>
+    <path>./Horizon Chase.sh</path>
+    <name>Horizon Chase</name>
+    <desc>Port nativo AArch64 da versao Android 2.6.9 por so-loader Unity/IL2CPP. Um unico loader negocia Mali/fbdev, KMSDRM, GLES, texturas comprimidas, audio e perfil de memoria em runtime. Possui som, controles nativos, save persistente e saida limpa. Requer dados legais do proprio usuario, preparados automaticamente pelo NXExtract.</desc>
+    <image>./horizonchase/cover.png</image>
+    <developer>Aquiris Game Studio</developer>
+    <publisher>Aquiris Game Studio</publisher>
+    <genre>Corrida / Arcade</genre>
+  </game>
+</gameList>

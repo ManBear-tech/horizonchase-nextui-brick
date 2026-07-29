@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/NextOs-Ports/NXExtract/security/advisories/new
+    about: Report traversal, symlink, overwrite or other security issues privately.
+  - name: NextOS community
+    url: https://discord.gg/DHfY62eDNN
+    about: Ask general usage questions and coordinate community device testing.

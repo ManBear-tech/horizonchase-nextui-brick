@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.so binary
+horizonchase-universal binary
+third_party/NXExtract/ui/build/nxextract-ui binary
