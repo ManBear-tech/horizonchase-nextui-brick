@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.2
+
+- The in-game **QUIT GAME** dialog now really closes the port. Confirming it
+  used to leave the process running with the music still playing and no input
+  responding, because `Application.Quit()` only flags the Unity player as
+  quitting and expects the Android Java activity to finish the process, which
+  does not exist in this host. The loader now routes both `Application.Quit`
+  overloads into the same shutdown the `Select + Start` hotkey uses, so the
+  game saves, stops audio and returns to the frontend.
+
 ## 1.0.1
 
 - Recipe `2.6.9-2`: accept both known Google Play builds of Horizon Chase
