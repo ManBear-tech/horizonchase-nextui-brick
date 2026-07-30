@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "horizonchase",
-  "version": "2.6.9-1",
+  "version": "2.6.9-2",
   "title": "HORIZON CHASE",
   "abi_order": [
     "arm64-v8a"
@@ -29,7 +29,10 @@
       "validate": {
         "type": "file",
         "size": 25023704,
-        "sha256": "7c46972d06b6b85f953bf61b477fdbf5bf22f7be55b57e4b54b4403f05478359",
+        "sha256": [
+          "7c46972d06b6b85f953bf61b477fdbf5bf22f7be55b57e4b54b4403f05478359",
+          "5439ae52c57f7ba96424baa2bd8b0031889d9069ff68661e522004642283fbc4"
+        ],
         "elf_machine": "{abi}"
       }
     },
@@ -126,21 +129,6 @@
         "size": 1804,
         "sha256": "31886bb0104e52d208010109c443681bee261728053a18462230dd0452990510"
       }
-    },
-    {
-      "id": "localization-table",
-      "source": {
-        "kind": "entry",
-        "patterns": [
-          "assets/hr.txt"
-        ]
-      },
-      "destination": "hr.txt",
-      "validate": {
-        "type": "file",
-        "size": 3198,
-        "sha256": "c8076dd0f3b22fec8d0ed56ef90aa2619f65c4d7168b2a7ff597300576e39fdc"
-      }
     }
   ],
   "hooks": [
@@ -180,7 +168,6 @@
     "bin",
     "Android",
     "UnityServicesProjectConfiguration.json",
-    "hr.txt",
     "UnityDataAssetPack.apk"
   ],
   "marker": ".nxextract-horizonchase.json",

@@ -152,7 +152,7 @@ The release is BYO-data. Obtain a legal ARM64 copy of Horizon Chase Android
    in `horizonchase/gamedata/`. The filename does not matter.
 3. Launch **Horizon Chase**.
 
-NXExtract 1.1.1 identifies content instead of trusting filenames. The pinned
+NXExtract 1.1.2 identifies content instead of trusting filenames. The pinned
 recipe verifies package identity, ABI, every required library, exact Unity
 and Android asset trees, sizes, hashes and ELF machine. It stages the payload,
 builds the deterministic Unity asset-pack, validates everything, and commits
@@ -392,7 +392,7 @@ nunca são aceitos. O launcher não fixa `SDL_AUDIODRIVER`.
    `horizonchase/gamedata/`; o nome não importa;
 3. abra **Horizon Chase**.
 
-O NXExtract 1.1.1 identifica conteúdo, pacote, ABI, bibliotecas, árvores
+O NXExtract 1.1.2 identifica conteúdo, pacote, ABI, bibliotecas, árvores
 Unity/Android, tamanhos, hashes e máquina ELF. Ele extrai numa área de stage,
 gera o asset-pack determinístico, valida tudo e publica atomicamente. Uma
 versão errada não substitui instalação boa, e o arquivo do usuário nunca é
