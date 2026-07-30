@@ -260,6 +260,20 @@ static int hc_patch(unsigned long offset, void *replacement) {
   return 1;
 }
 
+/*
+ * UnityEngine.Application.Quit() only flags the player as quitting: on Android
+ * the Java activity is what finishes the process afterwards.  This host has no
+ * Java player loop, so the managed call returns, the game tears its own view
+ * down and the process keeps running with audio and without input, which reads
+ * as a freeze.  Route the quit into the same shutdown the SELECT+START hotkey
+ * uses, so the render loop leaves through the normal focus/pause/save path.
+ */
+static void hc_application_quit(void) {
+  if (g_exit_requested) return;
+  g_exit_requested = 1;
+  fprintf(stderr, "[HCINPUT] Application.Quit: saída solicitada pelo jogo\n");
+}
+
 static unsigned long hc_method(const char *class_name, const char *method_name,
                                unsigned long exact_rva) {
   /*
@@ -318,6 +332,10 @@ int hc_input_install(uintptr_t il2cpp_base) {
        (void *)hc_horizontal},
       {"GamepadInputSource", "GetVertical", 0x1425370,
        (void *)hc_vertical},
+      {"UnityEngine.Application", "Quit", 0x2778FD8,
+       (void *)hc_application_quit},
+      {"UnityEngine.Application", "Quit(int)", 0x2779014,
+       (void *)hc_application_quit},
   };
 
   int patched = 0;
