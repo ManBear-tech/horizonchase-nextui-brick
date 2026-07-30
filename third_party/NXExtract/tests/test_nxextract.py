@@ -454,6 +454,21 @@ class NXExtractCase(unittest.TestCase):
             log,
         )
 
+    def test_rejected_candidates_are_reported_as_different_build(self):
+        self.write_recipe()
+        entries = self.merged_entries()
+        entries["lib/arm64-v8a/libgame.so"] = self.lib + b"-other-build"
+        make_zip(self.data / "other-build.apk", entries)
+        self.run_cli(expect=1)
+        log = (self.game / "test-extract.log").read_text(encoding="utf-8")
+        self.assertIn(
+            "required payload native was not found: 1 candidate(s) matched "
+            "the source pattern but failed validation",
+            log,
+        )
+        self.assertIn("probably a different build of the game", log)
+        self.assertIn("lib/arm64-v8a/libgame.so", log)
+
     def test_valid_staged_file_is_resumed_without_rewrite(self):
         self.write_recipe()
         source = self.data / "resume.apk"

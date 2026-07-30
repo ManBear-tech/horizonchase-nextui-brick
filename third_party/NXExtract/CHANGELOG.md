@@ -4,6 +4,14 @@ All notable NXExtract changes are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.1.2
+
+- Report matched-but-rejected candidates in required-payload plan errors.
+  When files match a payload's source pattern but every one fails validation
+  (size, sha256, crc32 or ELF machine), the error now says so and names one of
+  the rejected candidates instead of claiming the payload was not found.
+- Add a synthetic regression test for the rejected-candidate diagnostic.
+
 ## 1.1.1
 
 - Log the exact full-validation rejection for every attempted ABI when existing

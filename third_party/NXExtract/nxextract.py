@@ -30,7 +30,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
-NXEXTRACT_VERSION = "1.1.1"
+NXEXTRACT_VERSION = "1.1.2"
 FORMAT_VERSION = 1
 CHUNK_SIZE = 1024 * 1024
 DEFAULT_SAFETY_BYTES = 128 * 1024 * 1024
@@ -1458,6 +1458,8 @@ def _choose_one(rule, group, abi):
     source = rule["source"]
     spec = rule.get("validate", {})
     candidates = []
+    rejected = 0
+    rejected_example = None
     if source["kind"] in ("entry", "entry_or_file"):
         for _pattern, matches in _candidate_members(group, source, abi):
             valid = [
@@ -1465,16 +1467,26 @@ def _choose_one(rule, group, abi):
                 for archive, info, name in matches
                 if validate_member_candidate(archive, info, spec, abi)
             ]
+            invalid = [item for item in matches if item not in valid]
+            rejected += len(invalid)
+            if invalid and rejected_example is None:
+                archive, _info, name = invalid[0]
+                rejected_example = "%s:%s" % (archive.label, name)
             if valid:
                 candidates.extend(valid)
                 break
     loose_candidates = []
     if source["kind"] in ("file", "entry_or_file"):
+        loose_all = _candidate_loose(group, source, abi)
         loose_candidates = [
             loose
-            for loose in _candidate_loose(group, source, abi)
+            for loose in loose_all
             if validate_loose_candidate(loose, spec, abi)
         ]
+        loose_invalid = [item for item in loose_all if item not in loose_candidates]
+        rejected += len(loose_invalid)
+        if loose_invalid and rejected_example is None:
+            rejected_example = loose_invalid[0].label
     identities = {}
     for archive, info, name in candidates:
         key = (info.file_size, info.CRC)
@@ -1484,6 +1496,14 @@ def _choose_one(rule, group, abi):
         identities.setdefault(key, []).append(loose)
     if not identities:
         if rule.get("required", True):
+            if rejected:
+                raise PlanError(
+                    "required payload %s was not found: %d candidate(s) matched "
+                    "the source pattern but failed validation "
+                    "(size/sha256/crc32/ELF), e.g. %s; the input is probably a "
+                    "different build of the game"
+                    % (rule["id"], rejected, rejected_example)
+                )
             raise PlanError("required payload %s was not found" % rule["id"])
         return None
     if len(identities) > 1:
