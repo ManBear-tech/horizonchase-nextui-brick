@@ -20,7 +20,9 @@ hc_pids() {
       "$GAMEDIR/horizonchase"*) echo "${p##*/}"; continue ;;
     esac
     c=$(cat "$p/comm" 2>/dev/null || true)
-    a=$(tr '\0' ' ' < "$p/cmdline" 2>/dev/null || true)
+    # Apply the stderr redirection before opening cmdline: /proc entries may
+    # disappear between enumeration and read on short-lived system processes.
+    a=$(tr '\0' ' ' 2>/dev/null < "$p/cmdline" || true)
     d=
     case "$c:$a" in
       UnityMain:*|horizonchase:*|*:"./horizonchase "*|*:"$GAMEDIR/horizonchase "*)

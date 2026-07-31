@@ -25,8 +25,9 @@ the validated fbdev and KMSDRM devices:
 | NextOS, about 1 GB | 1280×720 Mali-450, SDL `mali`/fbdev, GLES2 | title, menus, cars, complete races, music/SFX, native controller, save/reload and clean exit |
 | ArkOS/R36S, about 640 MiB exposed RAM + 512 MiB test swap | 640×480 Mali-G31, KMSDRM, GLES3 | complete race, native ASTC/ETC2, music/SFX, native controller, persistent save and frontend return |
 | NextOS X5, 4 GB | 1920×1080 Mali-G310, KMSDRM, GLES3.2 | first-run APK extraction, title-to-gameplay navigation, HUD/race audio, sustained 30.0 FPS, save and clean exit |
+| ROCKNIX/RG-DS | 640×480 Mali-G52, Wayland/Panfrost, GLES3.1 | smooth first-run XAPK extraction, title/menu, clear ALSA music/SFX, native controller and clean hotkey exit |
 
-The public package uses the same loader SHA on all three classes of device. It
+The public package uses the same loader SHA on all four classes of device. It
 does not force an SDL video or audio driver. Backend ownership, GLES version,
 compressed-texture path, display size, audio output and memory tier are
 selected from the running system.
@@ -118,9 +119,11 @@ Unity/FMOD keeps control of music and sound effects. The compatibility layer
 implements Android AudioTrack/OpenSL behavior over queued SDL PCM at 24 kHz,
 stereo. Output selection is adaptive:
 
-1. use the firmware's inherited working backend;
+1. use the firmware's inherited working backend, except an inherited
+   PulseAudio-only selection whose server path is known to block before an
+   error can be returned;
 2. retry while the frontend releases its device;
-3. negotiate real PipeWire/Pulse/ALSA backends if needed;
+3. negotiate real ALSA/PipeWire/Pulse backends if needed;
 4. prefer speaker-capable outputs and leave HDMI as a fallback;
 5. reject silent `dummy` and `disk` drivers.
 
@@ -232,6 +235,7 @@ SHA-256 manifest and verifies the finished ZIP.
 | `HC_AUDIO_DRIVER=name` | Request one SDL audio backend before the fallback ladder |
 | `HC_AUDIO_ENUM=1` | Enumerate named SDL outputs during recovery |
 | `HC_NO_PREFER_SPEAKER=1` | Disable speaker-first output ordering |
+| `HC_AUDIO_KEEP_INHERITED_PULSE=1` | Engineering test: keep an inherited PulseAudio selection instead of the ALSA escape |
 | `HC_NO_AUDIO=1` | Diagnostic mute |
 | `HC_FORCE_SOFTWARE_TEXTURES=1` | Exercise software ASTC/ETC2 fallback |
 | `HC_NO_TEXTURE_DECODE=1` | Native-upload diagnostic only |
@@ -288,8 +292,9 @@ nos aparelhos fbdev e KMSDRM validados:
 | NextOS, cerca de 1 GB | 1280×720 Mali-450, SDL `mali`/fbdev, GLES2 | título, menus, carros, corridas completas, música/efeitos, controle nativo, save/reload e saída limpa |
 | ArkOS/R36S, cerca de 640 MiB expostos + 512 MiB de swap de teste | 640×480 Mali-G31, KMSDRM, GLES3 | corrida completa, ASTC/ETC2 nativos, música/efeitos, controle nativo, save persistente e retorno ao frontend |
 | NextOS X5, 4 GB | 1920×1080 Mali-G310, KMSDRM, GLES3.2 | extração real do APK, navegação do título ao gameplay, HUD/som da corrida, 30,0 FPS sustentados, save e saída limpa |
+| ROCKNIX/RG-DS | 640×480 Mali-G52, Wayland/Panfrost, GLES3.1 | extração inicial suave do XAPK, título/menu, música/efeitos claros via ALSA, controle nativo e saída limpa pelo atalho |
 
-O pacote público usa o mesmo SHA do loader nas três classes. Ele não força
+O pacote público usa o mesmo SHA do loader nas quatro classes. Ele não força
 driver SDL de vídeo nem de áudio. Ownership de contexto, versão GLES, caminho
 das texturas comprimidas, resolução, saída de som e perfil de memória são
 decididos pelo sistema em execução.
@@ -365,9 +370,11 @@ pular cenas nem lifecycle:
 
 Unity/FMOD continua comandando música e efeitos. O bridge implementa
 AudioTrack/OpenSL sobre PCM SDL em 24 kHz estéreo. Ele usa o backend herdado,
-espera o frontend liberar o device e, se necessário, negocia
-PipeWire/Pulse/ALSA e saídas reais de alto-falante. Drivers `dummy` e `disk`
-nunca são aceitos. O launcher não fixa `SDL_AUDIODRIVER`.
+mas evita uma seleção PulseAudio herdada que bloqueie antes de devolver erro;
+nesse caso, o ALSA disponível é aberto diretamente. Depois ele espera o
+frontend liberar o device e, se necessário, negocia ALSA/PipeWire/Pulse e
+saídas reais de alto-falante. Drivers `dummy` e `disk` nunca são aceitos. O
+launcher não fixa `SDL_AUDIODRIVER`.
 
 ### Controles
 
@@ -446,6 +453,7 @@ privados, cria manifesto SHA-256 e testa o ZIP final.
 | `HC_AUDIO_DRIVER=nome` | pede um backend antes da cascata |
 | `HC_AUDIO_ENUM=1` | enumera saídas SDL na recuperação |
 | `HC_NO_PREFER_SPEAKER=1` | desliga preferência por alto-falante |
+| `HC_AUDIO_KEEP_INHERITED_PULSE=1` | teste de engenharia: mantém PulseAudio herdado em vez do escape ALSA |
 | `HC_NO_AUDIO=1` | mudo de diagnóstico |
 | `HC_FORCE_SOFTWARE_TEXTURES=1` | testa decoder ASTC/ETC2 |
 | `HC_GLES_MAJOR=2\|3` | pede uma versão GLES para engenharia |

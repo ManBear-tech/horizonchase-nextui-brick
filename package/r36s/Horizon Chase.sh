@@ -46,9 +46,48 @@ export LD_LIBRARY_PATH="/usr/local/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-
 
 cd "$GAMEDIR" || exit 1
 exec > "$GAMEDIR/debug.log" 2>&1
-${ESUDO:-} chmod +x "$GAMEDIR/horizonchase" "$GAMEDIR/run.sh" \
-  2>/dev/null || chmod +x "$GAMEDIR/horizonchase" "$GAMEDIR/run.sh"
+hc_port_version=unknown
+if [ -r "$GAMEDIR/version.txt" ]; then
+  hc_port_version=$(tr -d '\r\n' < "$GAMEDIR/version.txt")
+  [ -n "$hc_port_version" ] || hc_port_version=unknown
+fi
+hc_runner_mode=missing
+if [ -f "$GAMEDIR/run-extractor.sh" ]; then
+  hc_runner_mode=readable
+  [ -x "$GAMEDIR/run-extractor.sh" ] && hc_runner_mode=executable
+fi
+printf '=== Horizon Chase port %s ===\n' "$hc_port_version"
+printf '[launcher] package runner=%s recipe=%s\n' \
+  "$hc_runner_mode" \
+  "$([ -r "$GAMEDIR/extractor.json" ] && printf readable || printf missing)"
+for executable in horizonchase run.sh run-extractor.sh nxextract-ui; do
+  [ -f "$GAMEDIR/$executable" ] || continue
+  ${ESUDO:-} chmod +x "$GAMEDIR/$executable" 2>/dev/null ||
+    chmod +x "$GAMEDIR/$executable" 2>/dev/null || true
+done
 ${ESUDO:-} chmod 666 "$CUR_TTY" /dev/uinput 2>/dev/null || true
+
+hc_runtime_missing() {
+  local missing= relative
+  for relative in \
+    libunity.so \
+    libil2cpp.so \
+    libmain.so \
+    bin/Data/Managed/Metadata/global-metadata.dat \
+    UnityServicesProjectConfiguration.json \
+    UnityDataAssetPack.apk; do
+    [ -s "$GAMEDIR/$relative" ] || missing="$missing $relative"
+  done
+  [ -d "$GAMEDIR/Android" ] || missing="$missing Android/"
+  printf '%s' "${missing# }"
+}
+
+hc_marker_state=absent
+[ -f "$GAMEDIR/.nxextract-horizonchase.json" ] &&
+  hc_marker_state=present
+hc_missing_before=$(hc_runtime_missing)
+printf '[launcher] data gate begin marker=%s missing=%s\n' \
+  "$hc_marker_state" "${hc_missing_before:-none}"
 
 # Private pre-release installs used a boot.config-only Swappy workaround and
 # created the asset-pack ZIP with host timestamps.  The loader now disables
@@ -110,16 +149,42 @@ if [ ! -f "$GAMEDIR/.nxextract-horizonchase.json" ] &&
   fi
 fi
 
-if [ -x "$GAMEDIR/run-extractor.sh" ] &&
-   [ -f "$GAMEDIR/extractor.json" ]; then
-  "$GAMEDIR/run-extractor.sh" || {
-    status=$?
-    printf 'Horizon Chase: data setup failed (%d)\n' "$status"
-    printf '\033c' >> "$CUR_TTY" 2>/dev/null || true
-    command -v pm_finish >/dev/null 2>&1 && pm_finish
-    exit "$status"
-  }
+if [ ! -f "$GAMEDIR/run-extractor.sh" ]; then
+  printf '[launcher] ERROR: data setup runner is missing: run-extractor.sh\n'
+  exit 72
 fi
+if [ ! -r "$GAMEDIR/extractor.json" ]; then
+  printf '[launcher] ERROR: data setup recipe is missing or unreadable: extractor.json\n'
+  exit 72
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '[launcher] ERROR: python3 is unavailable; NXExtract cannot run\n'
+  exit 72
+fi
+
+# Invoke through Bash deliberately. Some manual ZIP installers preserve the
+# file but discard its Unix execute bit; that must never skip owner-data setup.
+printf '[launcher] starting NXExtract data validation (execute bit independent)\n'
+bash "$GAMEDIR/run-extractor.sh" || {
+  status=$?
+  printf '[launcher] ERROR: owner-data setup failed status=%d\n' "$status"
+  printf '\033c' >> "$CUR_TTY" 2>/dev/null || true
+  command -v pm_finish >/dev/null 2>&1 && pm_finish
+  exit "$status"
+}
+printf '[launcher] NXExtract data validation complete\n'
+
+hc_missing_after=$(hc_runtime_missing)
+if [ -n "$hc_missing_after" ]; then
+  hc_marker_state=absent
+  [ -f "$GAMEDIR/.nxextract-horizonchase.json" ] &&
+    hc_marker_state=present
+  printf '[launcher] ERROR: runtime data gate failed marker=%s missing=%s\n' \
+    "$hc_marker_state" "$hc_missing_after"
+  printf '[launcher] refusing to start the loader with an incomplete payload\n'
+  exit 73
+fi
+printf '[launcher] runtime data gate OK\n'
 
 # Always enter through run.sh.  Handing the raw ELF to a platform helper would
 # skip the adaptive memory, texture, audio and controller environment.

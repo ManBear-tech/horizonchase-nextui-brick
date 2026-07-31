@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
+#include "egl_config_contract.h"
 #include "egl_shim.h"
 #include "util.h"
 
@@ -73,8 +74,13 @@ static int next_context_id = 1;
  * ASTC/ETC2 benefits from ES3 on R36S; ES2 remains the fallback. */
 static int g_es_major = 0;
 static int g_es_minor = 0;
+static int g_red_size = HC_EGL_RGBA_CHANNEL_BITS;
+static int g_green_size = HC_EGL_RGBA_CHANNEL_BITS;
+static int g_blue_size = HC_EGL_RGBA_CHANNEL_BITS;
+static int g_alpha_size = HC_EGL_RGBA_CHANNEL_BITS;
 static int g_depth_size = 24;
 static int g_stencil_size = 8;
+static char g_fallback_config_token;
 
 static _Thread_local _egl_context *current_context = NULL;
 static _Thread_local _egl_context *last_context = NULL;
@@ -243,7 +249,13 @@ static void egl_set_ctx_attrs(int major, int minor, int depth, int stencil) {
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-  SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 0);
+  /*
+   * This Unity build asks for format 8 (RGBA8888) and then performs an exact
+   * R/G/B/A comparison. RGBX8888 happens to be Mesa/Panfrost's first match
+   * when alpha is omitted, so advertising that real config makes Unity abort
+   * with "Unable to find a configuration matching minimum spec".
+   */
+  SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, HC_EGL_RGBA_CHANNEL_BITS);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, depth);
   SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, stencil);
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
@@ -307,6 +319,12 @@ void egl_shim_create_window(void) {
         g_es_minor = 0;
         g_depth_size = formats[f].depth;
         g_stencil_size = formats[f].stencil;
+        SDL_GL_GetAttribute(SDL_GL_RED_SIZE, &g_red_size);
+        SDL_GL_GetAttribute(SDL_GL_GREEN_SIZE, &g_green_size);
+        SDL_GL_GetAttribute(SDL_GL_BLUE_SIZE, &g_blue_size);
+        SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &g_alpha_size);
+        SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &g_depth_size);
+        SDL_GL_GetAttribute(SDL_GL_STENCIL_SIZE, &g_stencil_size);
       } else {
         fprintf(stderr,
                 "egl_shim: contexto ES%d depth%d/stencil%d falhou: %s\n",
@@ -325,8 +343,11 @@ void egl_shim_create_window(void) {
   }
 
   fprintf(stderr,
-          "egl_shim: contexto ES%d.%d depth%d/stencil%d criado em %dx%d\n",
-          g_es_major, g_es_minor, g_depth_size, g_stencil_size,
+          "egl_shim: contexto ES%d.%d rgba=%d/%d/%d/%d "
+          "depth=%d stencil=%d criado em %dx%d\n",
+          g_es_major, g_es_minor,
+          g_red_size, g_green_size, g_blue_size, g_alpha_size,
+          g_depth_size, g_stencil_size,
           SCREEN_WIDTH, SCREEN_HEIGHT);
   {
     const unsigned char *(*get_string)(unsigned int) =
@@ -355,30 +376,82 @@ void egl_shim_create_window(void) {
   r_eglCreateContext = (void *(*)(void *, void *, void *, const int *))dlsym(RTLD_DEFAULT, "eglCreateContext");
   if (r_eglGetCurrentDisplay) g_real_dpy = r_eglGetCurrentDisplay();
   if (r_eglGetCurrentSurface) g_win_surf = r_eglGetCurrentSurface(0x3059 /*EGL_DRAW*/);
-  if (g_real_dpy && r_eglChooseConfig) {
-    int attrs[] = {
-      0x3040, g_es_major >= 3 ? 0x40 : 0x04,
-      0x3033, 0x05,   /* EGL_SURFACE_TYPE, WINDOW|PBUFFER */
-      0x3024, 8,      /* EGL_RED_SIZE   */
-      0x3023, 8,      /* EGL_GREEN_SIZE */
-      0x3022, 8,      /* EGL_BLUE_SIZE  */
-      0x3025, g_depth_size,
-      0x3026, g_stencil_size,
-      0x3038          /* EGL_NONE */
-    };
-    void *cfgs[8]; int n = 0;
-    if (r_eglChooseConfig(g_real_dpy, attrs, cfgs, 8, &n) && n > 0) {
-      g_real_cfg = cfgs[0];
-      debugPrintf("egl_shim: EGLConfig real ES%d capturada (dpy=%p cfg=%p n=%d win_surf=%p)\n",
-                  g_es_major, g_real_dpy, g_real_cfg, n, g_win_surf);
+  if (g_real_dpy && r_eglChooseConfig && r_eglGetConfigAttrib) {
+    int attrs[HC_EGL_WINDOW_CONFIG_ATTR_CAPACITY];
+    hc_egl_build_window_config_attributes(
+        g_es_major, g_depth_size, g_stencil_size, attrs,
+        sizeof attrs / sizeof attrs[0]);
+    void *cfgs[64];
+    int n = 0;
+    if (r_eglChooseConfig(g_real_dpy, attrs, cfgs, 64, &n) && n > 0) {
+      hc_egl_config_properties required = {
+          .red = HC_EGL_RGBA_CHANNEL_BITS,
+          .green = HC_EGL_RGBA_CHANNEL_BITS,
+          .blue = HC_EGL_RGBA_CHANNEL_BITS,
+          .alpha = HC_EGL_RGBA_CHANNEL_BITS,
+          .depth = g_depth_size,
+          .stencil = g_stencil_size,
+          .samples = 0,
+          .renderable = g_es_major >= 3
+                            ? HC_EGL_OPENGL_ES3_BIT_KHR
+                            : HC_EGL_OPENGL_ES2_BIT,
+          .surfaces = HC_EGL_WINDOW_BIT | HC_EGL_PBUFFER_BIT,
+          .native_visual_type = 0
+      };
+      hc_egl_config_properties selected = {0};
+      int checked = n < 64 ? n : 64;
+      for (int i = 0; i < checked; i++) {
+        hc_egl_config_properties candidate = {0};
+#define HC_QUERY_CONFIG(field, attribute)                                  \
+        do {                                                               \
+          r_eglGetConfigAttrib(                                            \
+              g_real_dpy, cfgs[i], (attribute), &candidate.field);         \
+        } while (0)
+        HC_QUERY_CONFIG(red, HC_EGL_RED_SIZE);
+        HC_QUERY_CONFIG(green, HC_EGL_GREEN_SIZE);
+        HC_QUERY_CONFIG(blue, HC_EGL_BLUE_SIZE);
+        HC_QUERY_CONFIG(alpha, HC_EGL_ALPHA_SIZE);
+        HC_QUERY_CONFIG(depth, HC_EGL_DEPTH_SIZE);
+        HC_QUERY_CONFIG(stencil, HC_EGL_STENCIL_SIZE);
+        HC_QUERY_CONFIG(samples, HC_EGL_SAMPLES);
+        HC_QUERY_CONFIG(renderable, HC_EGL_RENDERABLE_TYPE);
+        HC_QUERY_CONFIG(surfaces, HC_EGL_SURFACE_TYPE);
+        HC_QUERY_CONFIG(native_visual_type, HC_EGL_NATIVE_VISUAL_TYPE);
+#undef HC_QUERY_CONFIG
+        if (hc_egl_config_meets_unity(&candidate, &required)) {
+          g_real_cfg = cfgs[i];
+          selected = candidate;
+          break;
+        }
+      }
+      if (g_real_cfg) {
+        fprintf(stderr,
+                "egl_shim: EGLConfig Unity selecionada "
+                "rgba=%d/%d/%d/%d depth=%d stencil=%d "
+                "samples=%d renderable=0x%x candidates=%d\n",
+                selected.red, selected.green, selected.blue, selected.alpha,
+                selected.depth, selected.stencil, selected.samples,
+                selected.renderable, n);
       /* pbuffer real p/ os contextos worker do Unity (uploads compartilhados) */
-      if (r_eglCreatePbufferSurface) {
-        static const int pb[] = { 0x3057, 16, 0x3056, 16, 0x3038 }; /* WIDTH,HEIGHT,NONE */
-        g_pbuf = r_eglCreatePbufferSurface(g_real_dpy, g_real_cfg, pb);
-        debugPrintf("egl_shim: pbuffer worker real = %p\n", g_pbuf);
+        if (r_eglCreatePbufferSurface) {
+          static const int pb[] = {
+              0x3057, 16, 0x3056, 16, HC_EGL_NONE
+          }; /* EGL_WIDTH, EGL_HEIGHT, EGL_NONE */
+          g_pbuf = r_eglCreatePbufferSurface(
+              g_real_dpy, g_real_cfg, pb);
+          debugPrintf("egl_shim: pbuffer worker real = %p\n", g_pbuf);
+        }
+      } else {
+        fprintf(stderr,
+                "egl_shim: nenhuma das %d EGLConfigs reais satisfaz "
+                "RGBA8888; usando contrato lógico SDL\n",
+                n);
       }
     } else {
-      debugPrintf("egl_shim: eglChooseConfig real falhou (n=%d) — usa attribs hardcoded\n", n);
+      fprintf(stderr,
+              "egl_shim: seleção EGLConfig RGBA8888 falhou (n=%d); "
+              "usando contrato lógico SDL\n",
+              n);
     }
   } else {
     debugPrintf("egl_shim: sem EGLDisplay real (dpy=%p) — usa attribs hardcoded\n", g_real_dpy);
@@ -498,9 +571,37 @@ EGLBoolean egl_shim_Terminate(EGLDisplay dpy) {
 EGLBoolean egl_shim_ChooseConfig(EGLDisplay dpy, const EGLint *attrib_list,
                                   EGLConfig *configs, EGLint config_size,
                                   EGLint *num_config) {
-  (void)dpy; (void)attrib_list;
+  (void)dpy;
+  static int request_logged;
+  if (!request_logged) {
+    fprintf(stderr,
+            "egl_shim: pedido EGLConfig da Unity "
+            "rgba=%d/%d/%d/%d depth=%d stencil=%d "
+            "samples=%d renderable=0x%x surfaces=0x%x\n",
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_RED_SIZE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_GREEN_SIZE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_BLUE_SIZE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_ALPHA_SIZE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_DEPTH_SIZE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_STENCIL_SIZE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_SAMPLES, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_RENDERABLE_TYPE, -1),
+            hc_egl_attribute_value(
+                attrib_list, HC_EGL_SURFACE_TYPE, -1));
+    request_logged = 1;
+  }
   if (configs && config_size > 0)
-    configs[0] = g_real_cfg ? (EGLConfig)g_real_cfg : (EGLConfig)strdup("config");
+    configs[0] = g_real_cfg
+                     ? (EGLConfig)g_real_cfg
+                     : (EGLConfig)&g_fallback_config_token;
   if (num_config)
     *num_config = 1;
   return EGL_TRUE;
@@ -722,22 +823,36 @@ EGLBoolean egl_shim_GetConfigAttrib(EGLDisplay dpy, EGLConfig config,
       r_eglGetConfigAttrib(g_real_dpy, g_real_cfg, attribute, value))
     return EGL_TRUE;
   switch (attribute) {
-  case 0x3020: *value = 24; break;  /* EGL_BUFFER_SIZE */
-  case 0x3021: *value = 0; break;   /* EGL_ALPHA_SIZE */
-  case 0x3022: *value = 8; break;   /* EGL_BLUE_SIZE */
-  case 0x3023: *value = 8; break;   /* EGL_GREEN_SIZE */
-  case 0x3024: *value = 8; break;   /* EGL_RED_SIZE */
-  case 0x3025: *value = g_depth_size; break;
-  case 0x3026: *value = g_stencil_size; break;
+  case HC_EGL_BUFFER_SIZE:
+    *value = HC_EGL_RGBA_CHANNEL_BITS * 4;
+    break;
+  case HC_EGL_ALPHA_SIZE:
+  case HC_EGL_BLUE_SIZE:
+  case HC_EGL_GREEN_SIZE:
+  case HC_EGL_RED_SIZE:
+    *value = HC_EGL_RGBA_CHANNEL_BITS;
+    break;
+  case HC_EGL_DEPTH_SIZE: *value = g_depth_size; break;
+  case HC_EGL_STENCIL_SIZE: *value = g_stencil_size; break;
   case 0x3027: *value = 0x3038; break; /* EGL_CONFIG_CAVEAT = EGL_NONE */
   case 0x3028: *value = 1; break;   /* EGL_CONFIG_ID */
-  case 0x3033: *value = 0x0005; break; /* EGL_SURFACE_TYPE = WINDOW|PBUFFER */
-  case 0x3040:
-  case 0x3042:
-    *value = g_es_major >= 3 ? 0x0040 : 0x0004;
+  case HC_EGL_NATIVE_VISUAL_TYPE: *value = 0; break;
+  case HC_EGL_SAMPLES:
+  case HC_EGL_SAMPLE_BUFFERS:
+  case HC_EGL_COVERAGE_SAMPLES_NV:
+    *value = 0;
     break;
-  case 0x3039: *value = 0x308E; break; /* EGL_COLOR_BUFFER_TYPE = EGL_RGB_BUFFER */
-  case 0x3032: *value = 0; break;   /* EGL_NATIVE_RENDERABLE */
+  case HC_EGL_DEPTH_ENCODING_NV: *value = 0; break;
+  case HC_EGL_SURFACE_TYPE:
+    *value = HC_EGL_WINDOW_BIT | HC_EGL_PBUFFER_BIT;
+    break;
+  case HC_EGL_RENDERABLE_TYPE:
+  case HC_EGL_CONFORMANT:
+    *value = g_es_major >= 3
+                 ? HC_EGL_OPENGL_ES3_BIT_KHR
+                 : HC_EGL_OPENGL_ES2_BIT;
+    break;
+  case HC_EGL_COLOR_BUFFER_TYPE: *value = HC_EGL_RGB_BUFFER; break;
   default:
     debugPrintf("egl_shim: GetConfigAttrib(0x%x) -> 0 (default)\n", attribute);
     *value = 0; break;

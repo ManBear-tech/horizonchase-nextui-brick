@@ -38,6 +38,7 @@
 #include "opensles_shim.h"
 #include "astc_decode.h"
 #include "etc2_decode.h"
+#include "audio_backend_policy.h"
 #include "util.h"
 #include <link.h>
 
@@ -5508,6 +5509,33 @@ static int hc_audio_driver_silent(const char *name) {
   return !name || strcmp(name, "dummy") == 0 || strcmp(name, "disk") == 0;
 }
 
+static int hc_audio_driver_available(const char *wanted) {
+  if (!wanted || !*wanted)
+    return 0;
+  int count = SDL_GetNumAudioDrivers();
+  for (int index = 0; index < count; index++) {
+    const char *name = SDL_GetAudioDriver(index);
+    if (name && strcmp(name, wanted) == 0)
+      return 1;
+  }
+  return 0;
+}
+
+static void hc_audio_log_outputs(void) {
+  const char *driver = SDL_GetCurrentAudioDriver();
+  int count = SDL_GetNumAudioDevices(0);
+  fprintf(stderr, "[AUDIO] driver=%s saídas=%d",
+          driver ? driver : "?", count);
+  int shown = count < 8 ? count : 8;
+  for (int index = 0; index < shown; index++) {
+    const char *name = SDL_GetAudioDeviceName(index, 0);
+    fprintf(stderr, " [%d]=%s", index, name ? name : "?");
+  }
+  if (count > shown)
+    fprintf(stderr, " ...");
+  fprintf(stderr, "\n");
+}
+
 /*
  * Some Batocera/Knulli-style images do not expose an ALSA "default" PCM.
  * Named-card enumeration is deliberately opt-in: on a normal handheld the
@@ -5515,10 +5543,27 @@ static int hc_audio_driver_silent(const char *name) {
  * and allow a short busy retry while the frontend releases the speaker.
  */
 static SDL_AudioDeviceID hc_audio_open_current(
-    const SDL_AudioSpec *want, SDL_AudioSpec *have, int enumerate) {
+    const SDL_AudioSpec *want, SDL_AudioSpec *have, int enumerate,
+    unsigned attempt) {
+  if (attempt <= 3 || attempt == 8 || attempt % 40 == 0) {
+    fprintf(stderr,
+            "[AUDIO] abertura #%u driver=%s device=default "
+            "pedido=%d/%u/S16 samples=%u\n",
+            attempt,
+            SDL_GetCurrentAudioDriver()
+                ? SDL_GetCurrentAudioDriver() : "?",
+            want->freq, want->channels, want->samples);
+  }
   SDL_AudioDeviceID output =
       SDL_OpenAudioDevice(NULL, 0, want, have, 0);
-  if (output || !enumerate)
+  if (output) {
+    fprintf(stderr,
+            "[AUDIO] device default abriu id=%u obtido=%d/%u/0x%x "
+            "samples=%u\n",
+            output, have->freq, have->channels, have->format, have->samples);
+    return output;
+  }
+  if (!enumerate)
     return output;
 
   static int (*get_num_devices)(int);
@@ -5584,14 +5629,17 @@ static int hc_audio_select_driver(const char *name) {
             name, current ? current : "?");
     return 0;
   }
+  fprintf(stderr, "[AUDIO] init driver=%s OK (atual=%s)\n",
+          name, current);
+  hc_audio_log_outputs();
   return 1;
 }
 
 /*
- * Same negotiation ladder validated by Sonic 4:
- *   explicit escape -> firmware auto -> Pulse/PipeWire -> remaining drivers.
- * Nothing is fixed in the launcher. A scan starts only after repeated default
- * failures, so a frontend that is still releasing ALSA gets time to do so.
+ * Negotiation combines the proven TASM2 server-to-ALSA escape with the
+ * multi-backend ladder validated by Sonic 4. Nothing is fixed in the launcher.
+ * A scan starts only after repeated default failures, so a frontend that is
+ * still releasing ALSA gets time to do so.
  */
 static SDL_AudioDeviceID hc_audio_open_adaptive(
     const SDL_AudioSpec *want, SDL_AudioSpec *have,
@@ -5614,25 +5662,50 @@ static SDL_AudioDeviceID hc_audio_open_adaptive(
   }
 
   if (!override_applied) {
-    const char *requested = getenv("HC_AUDIO_DRIVER");
-    if (!requested || !*requested)
-      requested = getenv("AUDIO_DRIVER");
-    if (requested && *requested) {
-      const char *driver =
-          strcmp(requested, "pulse") == 0 ? "pulseaudio" : requested;
-      fprintf(stderr, "[AUDIO] override solicitado: %s -> %s\n",
-              requested, driver);
+    const char *explicit_driver = getenv("HC_AUDIO_DRIVER");
+    if (!explicit_driver || !*explicit_driver)
+      explicit_driver = getenv("AUDIO_DRIVER");
+    const char *inherited_driver = getenv("SDL_AUDIODRIVER");
+    int inherited_pulse_fallback = 0;
+    const char *driver = hc_audio_choose_initial_driver(
+        explicit_driver, inherited_driver,
+        hc_audio_driver_available("alsa"),
+        getenv("HC_AUDIO_KEEP_INHERITED_PULSE") != NULL,
+        &inherited_pulse_fallback);
+    if (driver) {
+      if (inherited_pulse_fallback) {
+        fprintf(stderr,
+                "[AUDIO] SDL_AUDIODRIVER herdado=%s; "
+                "selecionando ALSA antes de abrir o backend de servidor\n",
+                inherited_driver);
+      } else {
+        fprintf(stderr, "[AUDIO] override solicitado: %s -> %s\n",
+                explicit_driver, driver);
+      }
       hc_audio_select_driver(driver);
     }
     override_applied = 1;
   }
 
-  if (!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO))
-    SDL_InitSubSystem(SDL_INIT_AUDIO);
+  if (!(SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO)) {
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+      fprintf(stderr, "[AUDIO] init automático falhou: %s\n",
+              SDL_GetError());
+    } else {
+      fprintf(stderr, "[AUDIO] init automático OK driver=%s\n",
+              SDL_GetCurrentAudioDriver()
+                  ? SDL_GetCurrentAudioDriver() : "?");
+      hc_audio_log_outputs();
+    }
+  }
   const char *current = SDL_GetCurrentAudioDriver();
   if (!hc_audio_driver_silent(current)) {
+    int enumerate_current =
+        enumerate ||
+        (strcmp(current, "alsa") == 0 && attempt >= 3);
     SDL_AudioDeviceID output =
-        hc_audio_open_current(want, have, enumerate && attempt >= 8);
+        hc_audio_open_current(
+            want, have, enumerate_current, attempt);
     if (output)
       return output;
   }
@@ -5669,7 +5742,7 @@ static SDL_AudioDeviceID hc_audio_open_adaptive(
       if (!hc_audio_select_driver(name))
         continue;
       SDL_AudioDeviceID output =
-          hc_audio_open_current(want, have, enumerate);
+          hc_audio_open_current(want, have, enumerate, attempt);
       if (output) {
         fprintf(stderr, "[AUDIO] fallback funcional: %s\n",
                 SDL_GetCurrentAudioDriver());
@@ -5687,6 +5760,22 @@ static SDL_AudioDeviceID hc_audio_open_adaptive(
   return 0;
 }
 
+static unsigned hc_audio_pcm_peak(
+    const int16_t *pcm, int sample_count) {
+  unsigned peak = 0;
+  if (!pcm || sample_count <= 0)
+    return 0;
+  for (int index = 0; index < sample_count; index++) {
+    int sample = pcm[index];
+    unsigned magnitude =
+        sample < 0 ? (unsigned)(-(sample + 1)) + 1u
+                   : (unsigned)sample;
+    if (magnitude > peak)
+      peak = magnitude;
+  }
+  return peak;
+}
+
 static void *fmod_audio_thread(void *arg) {
   (void)arg;
   void *fp = NULL, *gi = NULL;
@@ -5701,7 +5790,6 @@ static void *fmod_audio_thread(void *arg) {
   void *device = jni_fmod_device();
   void *bb = jni_fmod_bytebuffer();
   void *pcm = jni_fmod_pcm();
-  if (!SDL_WasInit(SDL_INIT_AUDIO)) SDL_InitSubSystem(SDL_INIT_AUDIO);
 
   int trace = getenv("HC_AUDIO_TRACE") != NULL;
   unsigned open_failures = 0;
@@ -5766,11 +5854,17 @@ static void *fmod_audio_thread(void *arg) {
 
     Uint32 target = (Uint32)bytes * (Uint32)buffers;
     unsigned long calls = 0, queued_bytes = 0;
+    unsigned peak = 0;
+    int signal_logged = 0;
     while (g_fmod_run && jni_fmod_should_run() &&
            fmod_get_info(g_fmod_env, device, 3) == 1 &&
            SDL_GetQueuedAudioSize(output) < target) {
       int result = fmod_process(g_fmod_env, device, bb);
       if (result != 0) break;
+      unsigned block_peak =
+          hc_audio_pcm_peak((const int16_t *)pcm, bytes / 2);
+      if (block_peak > peak)
+        peak = block_peak;
       if (SDL_QueueAudio(output, pcm, (Uint32)bytes) != 0) break;
       queued_bytes += (unsigned)bytes;
       calls++;
@@ -5782,6 +5876,13 @@ static void *fmod_audio_thread(void *arg) {
             rate, channels, block, buffers, have.freq, have.channels,
             SDL_GetCurrentAudioDriver()
                 ? SDL_GetCurrentAudioDriver() : "?");
+    fprintf(stderr,
+            "[AUDIO] prefill mixes=%lu bytes=%lu peak=%u queue=%u\n",
+            calls, queued_bytes, peak, SDL_GetQueuedAudioSize(output));
+    if (peak != 0) {
+      signal_logged = 1;
+      fprintf(stderr, "[AUDIO] PCM FMOD confirmado peak=%u\n", peak);
+    }
 
     while (g_fmod_run && jni_fmod_should_run() &&
            fmod_get_info(g_fmod_env, device, 3) == 1) {
@@ -5796,6 +5897,14 @@ static void *fmod_audio_thread(void *arg) {
       }
       int result = fmod_process(g_fmod_env, device, bb);
       if (result == 0) {
+        unsigned block_peak =
+            hc_audio_pcm_peak((const int16_t *)pcm, bytes / 2);
+        if (!signal_logged && block_peak != 0) {
+          signal_logged = 1;
+          fprintf(stderr,
+                  "[AUDIO] PCM FMOD confirmado peak=%u mix=%lu\n",
+                  block_peak, calls + 1);
+        }
         if (SDL_QueueAudio(output, pcm, (Uint32)bytes) != 0) break;
         queued_bytes += (unsigned)bytes;
         calls++;
@@ -6553,7 +6662,14 @@ int main(int argc, char **argv) {
      DRM/compositor: janela SDL + re-rota os egl* da Unity p/ egl_shim. */
   if (cup_use_kmsdrm()) {
     extern int egl_shim_ensure_current(void);
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) fprintf(stderr, "[F2] SDL_Init(VIDEO|AUDIO): %s\n", SDL_GetError());
+    /*
+     * Keep video independent from the host audio daemon. ROCKNIX may expose
+     * Pulse in SDL while its 32-bit/compat socket is unavailable; combining
+     * the flags makes SDL_Init report failure even though Wayland video is
+     * usable. Audio is negotiated later by the FMOD/OpenSL bridge.
+     */
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+      fprintf(stderr, "[F2] SDL_Init(VIDEO): %s\n", SDL_GetError());
     fprintf(stderr, "[F2] SDL/KMS: video driver = %s\n",
             SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
     egl_shim_create_window();

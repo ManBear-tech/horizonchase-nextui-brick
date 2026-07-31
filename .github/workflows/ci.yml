@@ -29,6 +29,23 @@ jobs:
             -o /tmp/horizon-game-path-test
           /tmp/horizon-game-path-test
 
+      - name: Test EGLConfig contract
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -Isrc \
+            tests/egl_config_contract_test.c src/egl_config_contract.c \
+            -o /tmp/horizon-egl-config-test
+          /tmp/horizon-egl-config-test
+
+      - name: Test audio backend policy
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -Isrc \
+            tests/audio_backend_policy_test.c src/audio_backend_policy.c \
+            -o /tmp/horizon-audio-backend-test
+          /tmp/horizon-audio-backend-test
+
+      - name: Test launcher owner-data gate
+        run: bash tests/launcher_data_gate_test.sh
+
       - name: Build and audit the BYO-data package
         run: ./package/build-portmaster-package.sh
 

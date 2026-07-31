@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.0.3
+
+- ROCKNIX's inherited `SDL_AUDIODRIVER=pulseaudio` no longer enters a server
+  backend that can block before returning an error. When there is no explicit
+  Horizon audio override and SDL provides ALSA, the FMOD AudioTrack bridge
+  selects ALSA before opening the device.
+- Other firmware selections remain automatic. `HC_AUDIO_DRIVER` still has
+  priority, while `HC_AUDIO_KEEP_INHERITED_PULSE=1` is an engineering escape
+  hatch for testing an inherited PulseAudio route.
+- Audio diagnostics now identify initialization, enumerated outputs, requested
+  and obtained PCM formats, queue prefill and the first non-zero FMOD PCM peak.
+- Owner-data setup no longer depends on `run-extractor.sh` retaining its Unix
+  execute bit after a manual ZIP installation. The launcher invokes NXExtract
+  explicitly through Bash and reports the marker and missing runtime payloads.
+- A mandatory post-extraction data gate refuses to start the loader unless the
+  Unity libraries, metadata, Android asset tree and generated asset pack are
+  present. An incomplete install now produces an actionable launcher error
+  instead of ending later at `so_load libunity FALHOU`.
+- Short-lived `/proc/<pid>/cmdline` races are silenced during stale-instance
+  detection without hiding a real matching Horizon process.
+- The SDL-owned KMS/Wayland path now selects a real RGBA8888 EGLConfig instead
+  of accepting the first RGBX8888 match. Unity 2022.3.33f1 requires exact
+  8/8/8/8 channel sizes; Mesa/Panfrost returned 8/8/8/0 first and Unity
+  intentionally stopped with `Unable to find a configuration matching minimum
+  spec`.
+- SDL video initialization is independent from audio initialization. A missing
+  PulseAudio compatibility socket can no longer make the successful Wayland
+  video startup look like a failed combined SDL initialization.
+- Physically validated on an RG-DS running ROCKNIX with Wayland/Panfrost:
+  first-run XAPK extraction completed, Unity reached the menu, ALSA delivered
+  non-zero FMOD PCM with clear audio, the native controller mapping worked and
+  `Select + Start` returned cleanly to the frontend.
+
 ## 1.0.2
 
 - The in-game **QUIT GAME** dialog now really closes the port. Confirming it
