@@ -12,6 +12,20 @@ proprietary game data.
 
 [Download the latest PortMaster package / Baixar o pacote PortMaster](https://github.com/NextOs-Ports/horizonchase-nextos/releases/latest)
 
+## Support this work
+
+These ports take real time and real money to build. If you enjoy them:
+
+- 💗 **GitHub Sponsors**: [github.com/sponsors/NextOs-Ports](https://github.com/sponsors/NextOs-Ports)
+- ☕ **Ko-fi** (PayPal/card): [ko-fi.com/nextos](https://ko-fi.com/nextos)
+- 🇧🇷 **PIX**: [livepix.gg/nextos](https://livepix.gg/nextos)
+
+## Community
+
+Questions, bug reports, help getting the port running, and news about the next ones:
+
+💬 **Discord:** [discord.gg/DHfY62eDNN](https://discord.gg/DHfY62eDNN)
+
 ## English
 
 ### Status
@@ -280,6 +294,20 @@ their rightsholders. This project is not affiliated with or endorsed by
 Aquiris, Epic Games or Unity Technologies.
 
 ## Português
+
+### Apoie este trabalho
+
+Fazer esses ports custa tempo e dinheiro de verdade. Se curte o resultado:
+
+- 💗 **GitHub Sponsors**: [github.com/sponsors/NextOs-Ports](https://github.com/sponsors/NextOs-Ports)
+- ☕ **Ko-fi** (PayPal/cartão): [ko-fi.com/nextos](https://ko-fi.com/nextos)
+- 🇧🇷 **PIX**: [livepix.gg/nextos](https://livepix.gg/nextos)
+
+### Comunidade
+
+Dúvidas, relatos de bug, ajuda pra colocar o port pra rodar e novidades dos próximos:
+
+💬 **Discord:** [discord.gg/DHfY62eDNN](https://discord.gg/DHfY62eDNN)
 
 ### Estado
 
