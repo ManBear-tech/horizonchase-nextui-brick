@@ -4,6 +4,17 @@ All notable NXExtract changes are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 1.1.3
+
+- Never fail an install because the scratch source cache could not be deleted.
+  The cache is now dropped after the payload is committed and after every
+  source archive is closed, and a removal that still fails is logged and left
+  for the next run instead of aborting. FUSE-backed shares (exFAT on Knulli and
+  Batocera, NFS, SMB) keep a hidden placeholder for files unlinked while open,
+  so `source-cache/bundle-*` answered `[Errno 39] Directory not empty` and a
+  fully installed game was reported as `owner-data setup failed status=1`.
+- Add a regression test covering an install whose source-cache removal fails.
+
 ## 1.1.2
 
 - Report matched-but-rejected candidates in required-payload plan errors.

@@ -438,6 +438,26 @@ class NXExtractCase(unittest.TestCase):
         self.run_cli()
         self.assert_payload()
 
+    @unittest.skipIf(os.geteuid() == 0, "root ignores the read-only directory")
+    def test_undeletable_source_cache_does_not_fail_a_committed_install(self):
+        # A FUSE-backed share (exFAT on Knulli, NFS, SMB) can refuse to drop the
+        # scratch cache. The payload is already committed at that point, so the
+        # run must still succeed. A read-only directory reproduces the refusal.
+        self.write_recipe()
+        make_zip(self.data / "merged.apk", self.merged_entries())
+        cache = self.game / ".nxextract/synthetic-port/source-cache"
+        trap = cache / "undeletable"
+        trap.mkdir(parents=True)
+        (trap / "pinned").write_bytes(b"pinned")
+        trap.chmod(0o500)
+        try:
+            self.run_cli()
+            self.assert_payload()
+            log = (self.game / "test-extract.log").read_text(encoding="utf-8")
+            self.assertIn("warning: kept source cache for the next run", log)
+        finally:
+            trap.chmod(0o700)
+
     def test_existing_data_rejection_logs_validation_reason(self):
         self.write_recipe()
         installed = self.game / "lib/arm64-v8a/libgame.so"

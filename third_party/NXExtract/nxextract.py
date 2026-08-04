@@ -30,7 +30,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
-NXEXTRACT_VERSION = "1.1.2"
+NXEXTRACT_VERSION = "1.1.3"
 FORMAT_VERSION = 1
 CHUNK_SIZE = 1024 * 1024
 DEFAULT_SAFETY_BYTES = 128 * 1024 * 1024
@@ -188,6 +188,30 @@ def remove_path(path):
         shutil.rmtree(path)
     else:
         os.unlink(path)
+
+
+def discard_path(path, logger=None, label=None):
+    """Drop a scratch path without ever failing the run.
+
+    FUSE-backed shares (exFAT on Knulli/Batocera, NFS, SMB) replace a file that
+    is unlinked while still open with a hidden placeholder, so the parent
+    directory can answer ENOTEMPTY even after every real entry is gone. Scratch
+    space that survives one extra run is harmless; a committed payload reported
+    as a failure is not.
+    """
+    try:
+        remove_path(path)
+        return True
+    except OSError as error:
+        failure = error
+    shutil.rmtree(path, ignore_errors=True)
+    if not os.path.lexists(path):
+        return True
+    if logger is not None:
+        logger.log(
+            "warning: kept %s for the next run (%s)" % (label or path, failure)
+        )
+    return False
 
 
 def fsync_directory(path):
@@ -2264,7 +2288,9 @@ def _journal_write(workspace, journal):
 def _finalize_published_transaction(workspace, logger):
     remove_path(_backup_root(workspace))
     remove_path(_stage_root(workspace))
-    remove_path(os.path.join(workspace, "source-cache"))
+    discard_path(
+        os.path.join(workspace, "source-cache"), logger, label="source cache"
+    )
     try:
         os.unlink(_journal_path(workspace))
     except FileNotFoundError:
@@ -2686,7 +2712,13 @@ def install_command(args):
                 progress,
                 logger,
             )
-            remove_path(os.path.join(workspace, "source-cache"))
+            for archive in archives:
+                archive.close()
+            discard_path(
+                os.path.join(workspace, "source-cache"),
+                logger,
+                label="source cache",
+            )
             progress.done()
             logger.log("=== installation complete ===")
             ui.stop(delay=float(recipe.data.get("ui_success_seconds", 1)))

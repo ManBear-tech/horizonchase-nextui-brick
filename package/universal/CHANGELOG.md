@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.4
+
+- A fully installed game is no longer reported as a failed install. NXExtract
+  1.1.3 drops its scratch source cache only after every source archive is
+  closed, and a removal the filesystem still refuses is logged instead of
+  aborting the run. On FUSE-backed shares — exFAT as Knulli and Batocera use it
+  for `/userdata`, plus NFS and SMB — a file unlinked while still open leaves a
+  hidden placeholder behind, so `source-cache/bundle-*` answered
+  `[Errno 39] Directory not empty` seconds after the payload had been committed
+  and validated. The launcher then stopped with
+  `owner-data setup failed status=1` even though the extraction had finished
+  correctly.
+- The post-extraction data gate is unchanged and still refuses to start the
+  loader with an incomplete payload.
+
 ## 1.0.3
 
 - ROCKNIX's inherited `SDL_AUDIODRIVER=pulseaudio` no longer enters a server
