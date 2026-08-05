@@ -226,6 +226,43 @@ def check_profile(entries, origin):
     return profile
 
 
+# Each DLC campaign keeps its own progress container in the profile.  A demo
+# profile ALREADY carries these containers, fully zeroed, and even carries
+# "unlocked" flags such as AyrtonChampionshipSaveData.IsEasyUnlocked -- so
+# their presence proves nothing.  Progress does: a race with TimesRaced or a
+# score can only exist if the player owned that campaign when they ran it.
+DLC_LABELS = {
+    "AyrtonCareerSaveData": "Senna Forever (carreira)",
+    "AyrtonChampionshipSaveData": "Senna Forever (campeonato)",
+    "SummerSaveData": "Summer Vibes",
+    "TurboCarsDLCSaveData": "Turbo Cars",
+}
+
+
+def dlc_evidence(profile):
+    """DLC campaigns the profile itself proves were played.
+
+    Discovered by shape, not by a hardcoded list, so a campaign added in a
+    later build is still recognized instead of silently ignored.
+    """
+    found = {}
+    for key, value in sorted(profile.items()):
+        if not key.endswith("SaveData") or not isinstance(value, dict):
+            continue
+        races = value.get("RaceDataList")
+        if not isinstance(races, list):
+            continue
+        played = 0
+        for race in races:
+            if not isinstance(race, dict):
+                continue
+            if (race.get("TimesRaced") or 0) > 0 or (race.get("Score") or 0) > 0:
+                played += 1
+        if played:
+            found[DLC_LABELS.get(key, key)] = played
+    return found
+
+
 def entitlements(profile):
     """What the profile itself proves the player owns. Never invented here."""
     full = bool(profile.get("UnlockedFullGame"))
@@ -250,6 +287,12 @@ def describe(profile, prefix="[import]"):
     print(f"{prefix} tokens ...... {profile.get('NumberOfTokens', 0)}")
     print(f"{prefix} jogo completo {'SIM' if full else 'NAO'}")
     print(f"{prefix} produtos .... {', '.join(products) if products else '(nenhum)'}")
+    dlcs = dlc_evidence(profile)
+    if dlcs:
+        for label, played in dlcs.items():
+            print(f"{prefix} DLC .......... {label} ({played} corrida(s) no perfil)")
+    else:
+        print(f"{prefix} DLC .......... nenhum com progresso neste perfil")
     if not full and not products:
         print(
             f"{prefix} aviso: este perfil nao carrega a compra do jogo "

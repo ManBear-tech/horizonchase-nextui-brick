@@ -16,6 +16,12 @@
 - Nothing is synthesized. The port releases only what the player's own profile
   already proves; a profile without the purchase imports its progress, stays
   on the demo and says so.
+- DLC campaigns are reported the same way. Their content ships inside the APK,
+  so a profile that carries them runs them offline. Ownership is read from the
+  campaign's own progress rather than from a flag: a profile that owns nothing
+  already carries every DLC container, zeroed, and even carries
+  `IsEasyUnlocked`, so only a race the player actually ran is proof. Campaigns
+  added in a later build are recognized by shape instead of being ignored.
 - Only the profile is imported. The rest of a phone's SharedPreferences
   describes that phone — resolution, quality, audio routing — and previously
   would have overridden the settings tuned for the handheld.

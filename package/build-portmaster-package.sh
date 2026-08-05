@@ -100,6 +100,20 @@ put 0755 "$PORT_DIR/tools/build_unity_asset_pack.py" \
   "horizonchase/tools/build_unity_asset_pack.py"
 put 0755 "$PORT_DIR/tools/import_android_save.py" \
   "horizonchase/tools/import_android_save.py"
+# The bench unlock lives in the working tree's run.sh so the port can be
+# maintained and tested on a device. It is stripped here rather than by hand:
+# forgetting once would ship it. The delimiters are literal and must keep
+# matching the ones in run.sh.
+sed -i '/^# >>> HC_BENCH_BLOCK/,/^# <<< HC_BENCH_BLOCK/d' \
+  "$STAGE/horizonchase/run.sh"
+if grep -qE 'HC_BENCH_BLOCK|HC_UNLOCK|HC_BENCH_PY|bench\.unlock|bench-unlock' \
+    "$STAGE/horizonchase/run.sh"; then
+  fail "the bench unlock survived the strip in the staged run.sh"
+fi
+if ! grep -qE '^# >>> HC_BENCH_BLOCK' "$PORT_DIR/run.sh"; then
+  printf 'package note: no bench block found in run.sh; nothing to strip\n' >&2
+fi
+
 put 0644 "$STATIC_DIR/extractor.json" \
   "horizonchase/extractor.json"
 put 0644 "$STATIC_DIR/gamedata/README.txt" \

@@ -161,6 +161,53 @@ output=$(python3 "$IMPORTER" --auto -g "$STRAY" 2>&1) ||
   fail "--auto failed on a stray file"
 [[ -z "$output" ]] || fail "--auto complained about a stray file: $output"
 
+# --- DLC ownership is read from progress, never from a flag ------------------
+# A profile that owns nothing already carries every DLC container, zeroed, and
+# even carries "unlocked" flags. Only a race the player actually ran proves the
+# campaign was owned.
+python3 - "$PROJECT_ROOT" <<'PY'
+import sys
+
+sys.path.insert(0, f"{sys.argv[1]}/tools")
+from import_android_save import dlc_evidence
+
+empty_container = {
+    "RaceDataList": [
+        {"Score": 0, "TimesRaced": 0, "BestPosition": 99, "ItemId": "chapter1"},
+    ],
+}
+demo = {
+    "AyrtonCareerSaveData": dict(empty_container),
+    "SummerSaveData": dict(empty_container),
+    # A locked profile carries this as true; it is not proof of anything.
+    "AyrtonChampionshipSaveData": {"IsEasyUnlocked": True, "RaceDataList": []},
+}
+if dlc_evidence(demo):
+    raise SystemExit(f"a demo profile was read as owning DLC: {dlc_evidence(demo)}")
+
+played = {
+    "AyrtonCareerSaveData": {
+        "RaceDataList": [
+            {"Score": 15400, "TimesRaced": 3, "ItemId": "chapter1"},
+            {"Score": 0, "TimesRaced": 0, "ItemId": "chapter2"},
+        ],
+    },
+}
+found = dlc_evidence(played)
+if len(found) != 1 or next(iter(found.values())) != 1:
+    raise SystemExit(f"played DLC races were not recognized: {found}")
+
+# A campaign shipped in a later build must still be recognized by shape.
+future = {"SomeNewThingSaveData": {"RaceDataList": [{"TimesRaced": 2}]}}
+if not dlc_evidence(future):
+    raise SystemExit("an unknown DLC container was ignored")
+
+# Anything that is not a race container must be left alone.
+noise = {"TelemetryData": {"SessionRunning": False}, "Cups": [{"TimesRaced": 9}]}
+if dlc_evidence(noise):
+    raise SystemExit(f"non-DLC data was read as a DLC: {dlc_evidence(noise)}")
+PY
+
 # --- limits prefs_load() enforces --------------------------------------------
 # Breaking either one makes the loader drop every entry, silently losing the
 # save, so the importer has to refuse to write such a file.

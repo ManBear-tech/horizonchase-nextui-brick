@@ -180,4 +180,74 @@ if [ -r "$GAMEDIR/tools/import_android_save.py" ] &&
     echo "[save] importação de perfil ignorada (status $?)"
 fi
 
+# >>> HC_BENCH_BLOCK — bancada interna, uso privativo >>>
+# Marca o direito do jogo completo NESTE install para testar a fiação do
+# desbloqueio (menu, campanha, pistas) sem depender de ter um perfil comprado
+# em mãos na hora. Não é caminho de jogador: o público é só a importação do
+# perfil do próprio dono, logo acima, que nunca inventa direito nenhum.
+#
+# Isto NUNCA entra numa release: build-portmaster-package.sh apaga este bloco
+# ao montar o pacote e recusa o zip se ele sobreviver. Mexer nos marcadores
+# >>>/<<< quebra essa remoção — não renomear.
+
+HC_UNLOCK=off   # <<<<<< on = destrava tudo (bancada) | off = estado real
+
+if [ "$HC_UNLOCK" = on ] || [ -f "$GAMEDIR/userdata/.bench-unlock" ]; then
+  command -v python3 >/dev/null 2>&1 &&
+  python3 - "$GAMEDIR" "$HC_UNLOCK" <<'HC_BENCH_PY' || true
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.join(sys.argv[1], "tools"))
+from import_android_save import PROFILE_KEY, Entry, read_prefs, write_prefs
+
+BENCH_PRODUCT = "bench.unlock"
+BENCH_SAVED = "_benchPreviousFullGame"
+
+game_dir, mode = sys.argv[1], sys.argv[2]
+userdata = os.path.join(game_dir, "userdata")
+dest = os.path.join(userdata, "shared_prefs.bin")
+flag = os.path.join(userdata, ".bench-unlock")
+entries = read_prefs(dest)
+
+entry = entries.get(PROFILE_KEY)
+if entry is not None and entry.sval:
+    profile = json.loads(entry.sval)
+else:
+    profile = {"UserProfileVersion": 1, "RevisionNumber": 1,
+               "Cups": [], "Races": [], "NumberOfTokens": 0}
+products = [str(p) for p in (profile.get("UnlockedProducts") or []) if p]
+
+if mode == "on":
+    profile.setdefault(BENCH_SAVED, bool(profile.get("UnlockedFullGame")))
+    profile["UnlockedFullGame"] = True
+    if BENCH_PRODUCT not in products:
+        products.append(BENCH_PRODUCT)
+    profile["UnlockedProducts"] = products
+    action = "ligada"
+else:
+    # Voltou para off: desfaz a marca e devolve o perfil ao estado real.
+    profile["UnlockedFullGame"] = bool(profile.pop(BENCH_SAVED, False))
+    profile["UnlockedProducts"] = [p for p in products if p != BENCH_PRODUCT]
+    action = "desligada"
+
+marked = Entry()
+marked.set_string(json.dumps(profile, separators=(",", ":")))
+entries[PROFILE_KEY] = marked
+os.makedirs(userdata, exist_ok=True)
+write_prefs(dest, entries)
+
+if mode == "on":
+    open(flag, "w").close()
+elif os.path.exists(flag):
+    os.unlink(flag)
+
+print("[bench] bancada %s -- jogo completo: %s | produtos: %s"
+      % (action, profile["UnlockedFullGame"],
+         profile["UnlockedProducts"] or "(nenhum)"))
+HC_BENCH_PY
+fi
+# <<< HC_BENCH_BLOCK <<<
+
 exec ./horizonchase

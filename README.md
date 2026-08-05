@@ -252,6 +252,13 @@ Nothing is ever synthesized: the port releases only what the player's own
 profile already proves. A profile without the purchase imports its progress and
 stays on the demo, and is reported as such.
 
+The DLC campaigns work the same way. Their content ships inside the APK, so
+once a profile carries them they run offline like everything else. Ownership is
+read from the campaign's own progress, never from a flag: a profile that owns
+nothing already carries every DLC container, zeroed, and even carries
+`IsEasyUnlocked`. Only a race the player actually ran proves the campaign was
+theirs. The importer reports which campaigns it found.
+
 Pulling the XML needs root or a backup tool that can read app-private data.
 Without it, only the Android device itself holds the entitlement.
 
@@ -538,6 +545,13 @@ celular. O save anterior fica sempre guardado em `shared_prefs.bin.bak`.
 Nada é inventado: o port libera apenas o que o perfil do próprio jogador já
 comprova. Um perfil sem a compra importa o progresso, continua na demo e é
 avisado disso.
+
+Com os DLCs é igual. O conteúdo deles vem dentro do APK, então uma vez que o
+perfil os carrega eles rodam offline como o resto. A posse é lida pelo
+progresso da própria campanha, nunca por um sinalizador: um perfil que não
+comprou nada já traz todos os containers de DLC zerados, e ainda traz
+`IsEasyUnlocked`. Só uma corrida que o jogador realmente rodou prova que a
+campanha era dele. O importador informa quais campanhas encontrou.
 
 Puxar o XML exige root ou um app de backup que leia dados privados. Sem isso,
 o direito continua só no aparelho Android.
