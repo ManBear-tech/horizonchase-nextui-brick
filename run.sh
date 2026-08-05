@@ -165,4 +165,19 @@ export TER_GAMEPAD=1
 # ⚠️ CUP_GCOFF chamava il2cpp_gc_disable por OFFSET do Terraria -> .rodata no HC = SIGSEGV.
 # Agora resolve por nome, mas segue OFF por padrão (não precisamos desligar o GC).
 [ -n "${CUP_GCOFF:-}" ] && export CUP_GCOFF || unset CUP_GCOFF
+
+# Perfil do Android trazido pelo próprio jogador. O Horizon Chase é free-to-play
+# e guarda a campanha comprada num direito dentro do perfil, não nos arquivos:
+# quem concede isso é a loja da Google, com a qual este port offline não fala.
+# Se houver um playerprefs.xml em gamedata/, ele entra aqui, uma única vez, e a
+# origem vai para userdata/save-imports/ (reimportar a cada abertura sobrescrever-
+# ia com o perfil velho do celular o progresso feito no aparelho). O port nunca
+# inventa direito nenhum: destrava só o que o perfil do jogador já comprova.
+# Importar jamais pode impedir o jogo de abrir — falha aqui é ruído, não parada.
+if [ -r "$GAMEDIR/tools/import_android_save.py" ] &&
+   command -v python3 >/dev/null 2>&1; then
+  python3 "$GAMEDIR/tools/import_android_save.py" --auto -g "$GAMEDIR" ||
+    echo "[save] importação de perfil ignorada (status $?)"
+fi
+
 exec ./horizonchase

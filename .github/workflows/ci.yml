@@ -46,6 +46,9 @@ jobs:
       - name: Test launcher owner-data gate
         run: bash tests/launcher_data_gate_test.sh
 
+      - name: Test Android profile import
+        run: bash tests/save_import_test.sh
+
       - name: Build and audit the BYO-data package
         run: ./package/build-portmaster-package.sh
 

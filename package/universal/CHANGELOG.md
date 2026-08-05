@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.1.0-beta.1
+
+- A player who owns Horizon Chase on Android can bring their own profile over.
+  The game is free-to-play and releases everything past the demo through an
+  entitlement stored in the player's profile rather than in the files on disk;
+  that entitlement is granted by the Google Play purchase flow, which an
+  offline port has no bridge to, so a fresh install started on the demo even
+  for an owner.
+- Dropping `com.aquiris.horizonchase.v2.playerprefs.xml` into `gamedata/` is
+  now enough. The launcher validates it, reports what it carries, merges it
+  into `userdata/shared_prefs.bin` and moves the source to
+  `userdata/save-imports/`. The source is consumed once, so a stale phone
+  profile cannot overwrite progress made on the handheld later.
+- Nothing is synthesized. The port releases only what the player's own profile
+  already proves; a profile without the purchase imports its progress, stays
+  on the demo and says so.
+- Only the profile is imported. The rest of a phone's SharedPreferences
+  describes that phone — resolution, quality, audio routing — and previously
+  would have overridden the settings tuned for the handheld.
+- The importer refuses to write a preferences file that would break the
+  loader's own limits. Exceeding them makes the loader drop every entry, which
+  would have looked like a lost save rather than a rejected import.
+- A failed or skipped import never blocks the game from starting.
+
 ## 1.0.4
 
 - A fully installed game is no longer reported as a failed install. NXExtract

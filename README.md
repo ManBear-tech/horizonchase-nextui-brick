@@ -203,6 +203,58 @@ horizonchase/
 └── userdata/                         # persistent preferences/save
 ```
 
+### Bring your Android profile over (offline)
+
+Horizon Chase is free-to-play: the APK ships every track, but the campaign
+beyond the demo is released by an entitlement stored in the player's profile,
+not by the files on disk. That entitlement is granted by the Google Play
+purchase flow, which this offline port has no bridge to — a fresh install
+therefore starts on the demo, exactly like a phone that never bought it.
+
+If you own the full game on Android, carry your own profile across. Horizon
+Chase keeps everything — progress and the entitlements attached to it — in a
+single Unity PlayerPrefs entry, `user_profile`.
+
+Pull it from the phone and drop it into `gamedata/`, next to the APK:
+
+```sh
+# on the Android device (SharedPreferences live in internal storage)
+adb pull /data/data/com.aquiris.horizonchase/shared_prefs/\
+com.aquiris.horizonchase.v2.playerprefs.xml
+
+# then copy that file into the port's gamedata/ folder
+```
+
+The next launch picks it up on its own. The launcher checks that the file
+really is a Horizon Chase profile, reports what it carries (revision, cups,
+races, tokens, entitlements), merges it into `userdata/shared_prefs.bin` and
+moves the source to `userdata/save-imports/`. Progress and purchases then work
+fully offline; the port never contacts a store.
+
+The source is consumed once on purpose: re-importing on every launch would
+overwrite progress made on the handheld with whatever the phone had.
+
+Only the profile itself is imported. The rest of a phone's SharedPreferences
+describes that phone — resolution, quality, audio routing — and would override
+the settings tuned for the handheld.
+
+The same tool runs by hand from a PC, against an unpacked port directory:
+
+```sh
+python3 tools/import_android_save.py com.aquiris.horizonchase.v2.playerprefs.xml \
+        -g /path/to/horizonchase
+```
+
+`-n` inspects a profile without writing; `--all` also takes the phone's
+settings. The previous save is always kept as `shared_prefs.bin.bak`.
+
+Nothing is ever synthesized: the port releases only what the player's own
+profile already proves. A profile without the purchase imports its progress and
+stays on the demo, and is reported as such.
+
+Pulling the XML needs root or a backup tool that can read app-private data.
+Without it, only the Android device itself holds the entitlement.
+
 ### Build
 
 The normal internal NextOS build follows the current NextOS toolchain/sysroot
@@ -437,6 +489,58 @@ Instalações privadas antigas são migradas uma vez: a linha obsoleta
 `swappy.disable=1` só é retirada quando o hash completo bate; o original vai
 para `userdata/migration-backups`; o asset-pack é refeito e então os dados são
 adotados pelo NXExtract.
+
+### Trazer seu perfil do Android (offline)
+
+O Horizon Chase é free-to-play: o APK traz todas as pistas, mas a campanha
+além da demo é liberada por um direito guardado no perfil do jogador, não
+pelos arquivos em disco. Quem concede esse direito é o fluxo de compra da
+Google Play, com o qual este port offline não conversa — por isso uma
+instalação nova começa na demo, igual a um celular que nunca comprou.
+
+Se você tem o jogo completo no Android, traga o seu próprio perfil. O Horizon
+Chase guarda tudo — o progresso e os direitos ligados a ele — numa única
+entrada de PlayerPrefs, `user_profile`.
+
+Puxe o arquivo do celular e largue em `gamedata/`, junto do APK:
+
+```sh
+# no aparelho Android (SharedPreferences ficam na memória interna)
+adb pull /data/data/com.aquiris.horizonchase/shared_prefs/\
+com.aquiris.horizonchase.v2.playerprefs.xml
+
+# depois copie esse arquivo para a pasta gamedata/ do port
+```
+
+A próxima abertura reconhece sozinha. O launcher confere que o arquivo é mesmo
+um perfil do Horizon Chase, mostra o que ele carrega (revisão, copas, corridas,
+tokens, produtos), funde com o `userdata/shared_prefs.bin` e move a origem para
+`userdata/save-imports/`. Depois disso o progresso e as compras valem offline;
+o port nunca fala com loja nenhuma.
+
+A origem é consumida uma vez de propósito: reimportar a cada abertura
+sobrescreveria com o perfil velho do celular o progresso feito no aparelho.
+
+Só o perfil é importado. O resto das SharedPreferences descreve aquele celular
+— resolução, qualidade, rota de áudio — e passaria por cima dos ajustes
+calibrados para o portátil.
+
+A mesma ferramenta roda na mão, do PC, sobre uma pasta do port descompactada:
+
+```sh
+python3 tools/import_android_save.py com.aquiris.horizonchase.v2.playerprefs.xml \
+        -g /caminho/do/horizonchase
+```
+
+Com `-n` ele só inspeciona, sem gravar; com `--all` leva também os ajustes do
+celular. O save anterior fica sempre guardado em `shared_prefs.bin.bak`.
+
+Nada é inventado: o port libera apenas o que o perfil do próprio jogador já
+comprova. Um perfil sem a compra importa o progresso, continua na demo e é
+avisado disso.
+
+Puxar o XML exige root ou um app de backup que leia dados privados. Sem isso,
+o direito continua só no aparelho Android.
 
 ### Compilar e empacotar
 

@@ -22,4 +22,5 @@ horizonchase/run-extractor.sh
 horizonchase/run.sh
 horizonchase/screenshot.png
 horizonchase/tools/build_unity_asset_pack.py
+horizonchase/tools/import_android_save.py
 horizonchase/version.txt

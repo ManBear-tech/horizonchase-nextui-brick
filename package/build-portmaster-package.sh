@@ -98,6 +98,8 @@ put 0755 "$UI_BINARY" \
   "horizonchase/nxextract-ui"
 put 0755 "$PORT_DIR/tools/build_unity_asset_pack.py" \
   "horizonchase/tools/build_unity_asset_pack.py"
+put 0755 "$PORT_DIR/tools/import_android_save.py" \
+  "horizonchase/tools/import_android_save.py"
 put 0644 "$STATIC_DIR/extractor.json" \
   "horizonchase/extractor.json"
 put 0644 "$STATIC_DIR/gamedata/README.txt" \
@@ -165,7 +167,8 @@ bash -n "$STAGE/Horizon Chase.sh"
 sh -n "$STAGE/horizonchase/run.sh"
 bash -n "$STAGE/horizonchase/run-extractor.sh"
 python3 - "$STAGE/horizonchase/nxextract.py" \
-             "$STAGE/horizonchase/tools/build_unity_asset_pack.py" <<'PY'
+             "$STAGE/horizonchase/tools/build_unity_asset_pack.py" \
+             "$STAGE/horizonchase/tools/import_android_save.py" <<'PY'
 import sys
 
 for path in sys.argv[1:]:
@@ -229,7 +232,8 @@ fi
 if find "$STAGE" \( \
     -name '*.log' -o -name '*.raw' -o -name '*.ppm' -o \
     -name 'debug.log' -o -name 'userdata' -o -name 'artifacts' -o \
-    -name 'HANDOFF.md' -o -name '__pycache__' -o -name '*.pyc' \
+    -name 'HANDOFF.md' -o -name '__pycache__' -o -name '*.pyc' -o \
+    -name 'dev_*.py' -o -name 'save-imports' \
   \) -print -quit | grep . >/dev/null; then
   fail "development artifact entered the public staging tree"
 fi
