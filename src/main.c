@@ -27,6 +27,8 @@
 #include <time.h>
 #include <ucontext.h>
 #include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <SDL2/SDL.h>
@@ -3702,6 +3704,101 @@ static void ter_name_pump(void) {
     }
   }
 }
+/*
+ * [HCFB] fbdev com fb0 de DUAS páginas (yres_virtual = 2*yres, pan 0↔yres).
+ *
+ * No Utgard (Mali-450) o blob desenha as duas páginas e o pan sempre mostra um
+ * frame válido. Em blob que renderiza UMA página só (visto no Bifrost/ng), o
+ * pan alterna imagem↔página nunca desenhada = pisca preto (mesma assinatura do
+ * MC4/rockmanxdive; fix provado = espelhar a página renderizada na outra).
+ *
+ * Nada aqui muda comportamento em aparelho são: o espelho só liga quando a
+ * sonda OBSERVA, no próprio aparelho, pan alternando com uma página sempre
+ * preta enquanto a outra tem conteúdo. Em fb de página única, formato != 32bpp
+ * ou aparelho KMSDRM a sonda se desativa. HC_FB_MIRROR=0 desliga tudo;
+ * HC_FB_MIRROR=1 força o espelho (diagnóstico de campo).
+ */
+static void hc_fb_pages_frame(void) {
+  static int state;              /* 0=sondando 1=espelho ativo -1=off */
+  static int fd = -1;
+  static unsigned char *map;
+  static size_t page, maplen, src_off, dst_off;
+  static unsigned swaps, probes, seen_pan0, seen_pan1;
+  static unsigned content_probes[2], black_probes[2];
+  if (state < 0) return;
+  swaps++;
+  if (state == 1) {              /* espelho ativo: copia após CADA present */
+    memcpy(map + dst_off, map + src_off, page);
+    return;
+  }
+  {
+    const char *env = getenv("HC_FB_MIRROR");
+    if (env && *env == '0') { state = -1; return; }
+    if (swaps < 30 || (swaps & 7)) return;   /* deixa o boot assentar; sonda a cada 8 */
+  }
+  if (fd < 0) {
+    struct fb_var_screeninfo v; struct fb_fix_screeninfo f;
+    fd = open("/dev/fb0", O_RDWR | O_CLOEXEC);
+    if (fd < 0 || ioctl(fd, FBIOGET_VSCREENINFO, &v) < 0 ||
+        ioctl(fd, FBIOGET_FSCREENINFO, &f) < 0 ||
+        v.bits_per_pixel != 32 || v.yres == 0 ||
+        v.yres_virtual < 2 * v.yres || f.line_length == 0) {
+      if (fd >= 0) { close(fd); fd = -1; }
+      state = -1; return;        /* página única / formato inesperado: fora */
+    }
+    page = (size_t)f.line_length * v.yres;
+    maplen = (size_t)f.line_length * v.yres_virtual;
+    map = mmap(NULL, maplen, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (map == MAP_FAILED) { map = NULL; close(fd); fd = -1; state = -1; return; }
+    fprintf(stderr, "[HCFB] fb0 %ux%u virtual=%u stride=%u — sonda de páginas ativa\n",
+            v.xres, v.yres, v.yres_virtual, f.line_length);
+    if (getenv("HC_FB_MIRROR") && *getenv("HC_FB_MIRROR") == '1') {
+      src_off = 0; dst_off = page; state = 1;
+      fprintf(stderr, "[HCFB] HC_FB_MIRROR=1: espelho página0→página1 FORÇADO\n");
+      return;
+    }
+  }
+  {
+    struct fb_var_screeninfo v;
+    if (ioctl(fd, FBIOGET_VSCREENINFO, &v) < 0) { state = -1; return; }
+    if (v.yoffset == 0) seen_pan0 = 1; else seen_pan1 = 1;
+    for (int pg = 0; pg < 2; pg++) {           /* 48 amostras na diagonal de cada página */
+      unsigned nonblack = 0;
+      size_t stride = page / v.yres;           /* = line_length do fb */
+      for (int i = 0; i < 48; i++) {
+        size_t x = (size_t)(v.xres * (i + 1) / 50);
+        size_t y = (size_t)(v.yres * (i + 1) / 50);
+        uint32_t px;
+        memcpy(&px, map + (size_t)pg * page + y * stride + x * 4, 4);
+        if (px & 0x00FFFFFFu) nonblack++;
+      }
+      if (nonblack >= 4) content_probes[pg]++; else black_probes[pg]++;
+    }
+    probes++;
+    if (probes >= 12) {
+      int black_pg = -1;
+      if (seen_pan0 && seen_pan1) {
+        if (black_probes[1] >= 11 && content_probes[0] >= 10) black_pg = 1;
+        else if (black_probes[0] >= 11 && content_probes[1] >= 10) black_pg = 0;
+      }
+      if (black_pg >= 0) {
+        src_off = black_pg ? 0 : page;
+        dst_off = black_pg ? page : 0;
+        state = 1;
+        fprintf(stderr, "[HCFB] pan alterna e página %d está sempre preta "
+                "(conteúdo=%u/%u preto=%u/%u) → espelho LIGADO\n",
+                black_pg, content_probes[!black_pg], probes,
+                black_probes[black_pg], probes);
+      } else if (probes >= 24) {
+        state = -1;
+        munmap(map, maplen); map = NULL; close(fd); fd = -1;
+        fprintf(stderr, "[HCFB] duas páginas saudáveis (pan0=%u pan1=%u "
+                "conteúdo=%u,%u) — sonda encerrada, nada a fazer\n",
+                seen_pan0, seen_pan1, content_probes[0], content_probes[1]);
+      }
+    }
+  }
+}
 static unsigned my_eglSwapBuffers(void *dpy, void *surf) {
   ter_nuke_methods();   /* TER_NUKEKB: neutraliza KeyboardInput.Update (lazy, até achar) */
   ter_fix_singleplayer(); /* TER_FIXSP: neutraliza OldSaveSynchronise.CopyOldSaves (tela preta SP) */
@@ -3839,10 +3936,58 @@ static unsigned my_eglSwapBuffers(void *dpy, void *surf) {
                      clear_color[3]);
         p_colormask(mask[0], mask[1], mask[2], mask[3]);
         if (scissor) hc_r_Enable(0x0C11);
+    } else if (!rs_enabled() && g_hc_gl_state.initialized &&
+               g_hc_gl_state.framebuffer != 0 && p_colormask &&
+               p_clearcolor && p_clear && hc_r_Enable && hc_r_Disable) {
+        /*
+         * Caminho GLES3 (Bifrost/ng): o Unity resolve o frame em FBO e pode
+         * apresentar com um FBO != 0 ainda bound. No Utgard isso nunca ocorre
+         * (o clear acima sempre rodou), então este ramo é letra morta lá; no
+         * ng ele evita que o A-only clear seja pulado — sem ele o OSD faz
+         * blend do fb0 com alpha 0 do jogo e a tela pisca/preteja.
+         * Religa o framebuffer 0 SÓ para o clear e restaura o bind do jogo.
+         * Em ES3 usa GL_DRAW_FRAMEBUFFER para não tocar o READ binding.
+         */
+        static void (*p_bindfb)(unsigned, unsigned);
+        static unsigned bind_target;   /* 0x8CA9 em ES3, 0x8D40 em ES2 */
+        static int announced;
+        if (!p_bindfb) {
+          p_bindfb = hc_r_BindFramebuffer ? hc_r_BindFramebuffer
+                     : (void (*)(unsigned, unsigned))dlsym(RTLD_DEFAULT, "glBindFramebuffer");
+          const char *(*p_getstr)(unsigned) = dlsym(RTLD_DEFAULT, "glGetString");
+          const char *ver = p_getstr ? p_getstr(0x1F02 /* GL_VERSION */) : NULL;
+          bind_target = (ver && strstr(ver, "OpenGL ES 3")) ? 0x8CA9 : 0x8D40;
+        }
+        if (p_bindfb) {
+          unsigned char mask[4];
+          float clear_color[4];
+          memcpy(mask, g_hc_gl_state.color_mask, sizeof mask);
+          memcpy(clear_color, g_hc_gl_state.clear_color, sizeof clear_color);
+          unsigned char scissor = g_hc_gl_state.scissor;
+          if (!announced) {
+            announced = 1;
+            fprintf(stderr, "[HCALPHA] swap com FBO=%u bound: A-only clear via "
+                    "rebind (target=0x%X)\n", g_hc_gl_state.framebuffer, bind_target);
+          }
+          if (scissor) hc_r_Disable(0x0C11);
+          p_bindfb(bind_target, 0);
+          p_colormask(0, 0, 0, 1);
+          p_clearcolor(0, 0, 0, 1);
+          p_clear(0x00004000 /* GL_COLOR_BUFFER_BIT */);
+          p_clearcolor(clear_color[0], clear_color[1], clear_color[2],
+                       clear_color[3]);
+          p_colormask(mask[0], mask[1], mask[2], mask[3]);
+          p_bindfb(bind_target, g_hc_gl_state.framebuffer);
+          if (scissor) hc_r_Enable(0x0C11);
+        }
     }
   }
   if (!r_eglSwapBuffers) r_eglSwapBuffers = dlsym(RTLD_DEFAULT, "eglSwapBuffers");
-  return r_eglSwapBuffers ? r_eglSwapBuffers(dpy, surf) : 1;
+  {
+    unsigned swap_ret = r_eglSwapBuffers ? r_eglSwapBuffers(dpy, surf) : 1;
+    if (!cup_use_kmsdrm()) hc_fb_pages_frame();  /* [HCFB] só no caminho fbdev */
+    return swap_ret;
+  }
 }
 static unsigned g_egp_n = 0;
 
