@@ -1,6 +1,23 @@
 # Changelog
 
-## 1.1.0-beta.1
+## 1.2.0
+
+- Fixes the black/flickering picture seen on Amlogic-ng boxes (S922X,
+  Mali-G52 with the fbdev blob at 1080p) while keeping every proven device
+  byte-for-byte on its 1.0.4 behavior:
+  - The opaque-backbuffer alpha clear now also runs when the GLES3 driver
+    presents with a framebuffer object still bound. The Amlogic OSD blends
+    fb0 by pixel alpha, and skipping that clear let frames with alpha zero
+    scan out as black. On Utgard this branch never executes.
+  - The loader now probes the two fb0 pages after boot. If the panel pan
+    alternates while one page never receives a frame, the rendered page is
+    mirrored onto the dead one after every present (the proven two-page
+    fbdev recipe). On healthy devices the probe observes both pages carrying
+    content and shuts itself off seconds in; KMSDRM devices skip all of it.
+  - `HC_FB_MIRROR=0` disables the probe, `HC_FB_MIRROR=1` forces the mirror
+    for field diagnosis; both paths report what they saw in the log.
+
+## 1.1.0-beta.1 / 1.1.0-beta.2 (folded into 1.2.0)
 
 - A player who owns Horizon Chase on Android can bring their own profile over.
   The game is free-to-play and releases everything past the demo through an
