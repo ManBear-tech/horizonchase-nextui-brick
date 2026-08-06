@@ -50,10 +50,7 @@ recipes and documentation are welcome:
 - 🐛 **Bugs and proposals**: [GitHub Issues](https://github.com/NextOs-Ports/NXExtract/issues);
 - 🔀 **Code**: [Pull Requests](https://github.com/NextOs-Ports/NXExtract/pulls) and
   the [contribution guide](CONTRIBUTING.md);
-- 💬 **Community**: [NextOS Discord](https://discord.gg/DHfY62eDNN);
-- 💗 **GitHub Sponsors**: [github.com/sponsors/NextOs-Ports](https://github.com/sponsors/NextOs-Ports);
-- ☕ **Ko-fi**: [ko-fi.com/nextos](https://ko-fi.com/nextos);
-- 🇧🇷 **PIX**: [livepix.gg/nextos](https://livepix.gg/nextos).
+- 💬 **Community**: [NextOS Discord](https://discord.gg/DHfY62eDNN).
 
 External filenames are never game identifiers. A user may rename an APK,
 APKM, APKS or XAPK freely; NXExtract inspects its contents, Android package,
