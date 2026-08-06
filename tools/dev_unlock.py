@@ -32,6 +32,8 @@ from import_android_save import (  # noqa: E402
     PROFILE_KEY,
     Entry,
     SaveError,
+    profile_json,
+    profile_text,
     read_prefs,
     write_prefs,
 )
@@ -54,7 +56,7 @@ def load_profile(entries):
     if entry is None or not entry.sval:
         return dict(MINIMAL_PROFILE), False
     try:
-        profile = json.loads(entry.sval)
+        profile = profile_json(entry.sval)
     except json.JSONDecodeError as exc:
         raise SaveError(f"'{PROFILE_KEY}' existente nao e JSON valido ({exc})")
     if not isinstance(profile, dict):
@@ -63,8 +65,9 @@ def load_profile(entries):
 
 
 def store_profile(entries, profile):
+    """Write the profile back the way the port's game stores it: bare JSON."""
     entry = Entry()
-    entry.set_string(json.dumps(profile, separators=(",", ":")))
+    entry.set_string(profile_text(profile))
     entries[PROFILE_KEY] = entry
 
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.2.1
+
+- Aceita o perfil do Android no formato que o aparelho realmente grava. O
+  backend PlayerPrefs v2 da Unity no celular (o que carimba
+  `__UNITY_PLAYERPREFS_VERSION__`) escapa chaves e valores em porcentagem
+  antes de chegarem ao SharedPreferences, então o `user_profile` de um
+  celular de verdade vem como `%7B%22UniqueUserID%22...` e não como JSON cru.
+  O importador só aceitava JSON cru e recusava o perfil legítimo com
+  "`user_profile` nao e JSON valido" — o jogador largava o XML em `gamedata/`
+  e nada acontecia.
+- No port, porém, o jogo lê e grava o `user_profile` na forma crua (v1) — o
+  desescape do celular está preso ao marcador de versão do PlayerPrefs, que o
+  filtro de escopo descarta de propósito. Então a importação decodifica na
+  entrada e grava JSON puro, validado num aparelho de verdade com perfil
+  comprado: guardar os bytes escapados fazia o jogo abrir num perfil zerado.
+- A chave `user_profile` também é reconhecida escapada, tanto na varredura do
+  `gamedata/` quanto na importação.
+
 ## 1.2.0
 
 - Fixes the black/flickering picture seen on Amlogic-ng boxes (S922X,

@@ -200,7 +200,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(sys.argv[1], "tools"))
-from import_android_save import PROFILE_KEY, Entry, read_prefs, write_prefs
+from import_android_save import (PROFILE_KEY, Entry, profile_json, profile_text,
+                                 read_prefs, write_prefs)
 
 BENCH_PRODUCT = "bench.unlock"
 BENCH_SAVED = "_benchPreviousFullGame"
@@ -213,7 +214,9 @@ entries = read_prefs(dest)
 
 entry = entries.get(PROFILE_KEY)
 if entry is not None and entry.sval:
-    profile = json.loads(entry.sval)
+    # Lê nas duas grafias (um resto escapado da 1.2.1-teste ainda pode existir);
+    # a gravação é sempre JSON cru, que é a forma que o jogo lê no port.
+    profile = profile_json(entry.sval)
 else:
     profile = {"UserProfileVersion": 1, "RevisionNumber": 1,
                "Cups": [], "Races": [], "NumberOfTokens": 0}
@@ -233,7 +236,7 @@ else:
     action = "desligada"
 
 marked = Entry()
-marked.set_string(json.dumps(profile, separators=(",", ":")))
+marked.set_string(profile_text(profile))
 entries[PROFILE_KEY] = marked
 os.makedirs(userdata, exist_ok=True)
 write_prefs(dest, entries)

@@ -230,6 +230,13 @@ Only the profile itself is imported. The rest of a phone's SharedPreferences
 describes that phone — resolution, quality, audio routing — and would override
 the settings tuned for the handheld.
 
+The file is accepted exactly as the device writes it. Unity's PlayerPrefs v2
+backend on the phone percent-escapes keys and values before they reach
+SharedPreferences, so a real profile arrives as `%7B%22UniqueUserID%22...`
+rather than as bare JSON. The port's game, though, reads and writes the
+profile plain, so the import decodes on the way in and lands bare JSON — the
+form the game actually reads.
+
 The same tool runs by hand from a PC, against an unpacked port directory:
 
 ```sh
@@ -515,6 +522,13 @@ sobrescreveria com o perfil velho do celular o progresso feito no aparelho.
 Só o perfil é importado. O resto das SharedPreferences descreve aquele celular
 — resolução, qualidade, rota de áudio — e passaria por cima dos ajustes
 calibrados para o portátil.
+
+O arquivo é aceito do jeito que o aparelho grava. O backend PlayerPrefs v2 da
+Unity no celular escapa chaves e valores em porcentagem antes de chegarem ao
+SharedPreferences, então um perfil de verdade vem como
+`%7B%22UniqueUserID%22...`, e não como JSON cru. Já o jogo no port lê e grava
+o perfil na forma crua, então a importação decodifica na entrada e grava JSON
+puro — a forma que o jogo de fato lê.
 
 A mesma ferramenta roda na mão, do PC, sobre uma pasta do port descompactada:
 

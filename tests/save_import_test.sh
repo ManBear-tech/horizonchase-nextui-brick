@@ -57,13 +57,12 @@ PY
 
 profile_field() {
   python3 - "$PROJECT_ROOT" "$1" "$2" <<'PY'
-import json
 import sys
 
 sys.path.insert(0, f"{sys.argv[1]}/tools")
-from import_android_save import read_prefs
+from import_android_save import profile_json, read_prefs
 
-profile = json.loads(read_prefs(sys.argv[2])["user_profile"].sval)
+profile = profile_json(read_prefs(sys.argv[2])["user_profile"].sval)
 print(profile.get(sys.argv[3]))
 PY
 }
@@ -206,6 +205,71 @@ if not dlc_evidence(future):
 noise = {"TelemetryData": {"SessionRunning": False}, "Cups": [{"TimesRaced": 9}]}
 if dlc_evidence(noise):
     raise SystemExit(f"non-DLC data was read as a DLC: {dlc_evidence(noise)}")
+PY
+
+# --- the profile as a real device actually writes it -------------------------
+# Unity's PlayerPrefs v2 backend on the phone (the one that stamps
+# __UNITY_PLAYERPREFS_VERSION__) percent-escapes keys and values before they
+# ever reach SharedPreferences, so a profile pulled off a phone arrives as
+# %7B%22UniqueUserID%22... and not as bare JSON. The port's game reads and
+# writes user_profile PLAIN (v1) -- proven in-game by the bench unlock, and by
+# 1.2.1-teste, where the escaped bytes were kept verbatim and the game started
+# a fresh demo profile on a purchased account. So the import must decode on
+# the way in and land bare JSON.
+ESCAPED="$TEST_ROOT/escaped"
+mkdir -p "$ESCAPED/gamedata"
+python3 - "$ESCAPED/gamedata/com.aquiris.horizonchase.v2.playerprefs.xml" <<'PY'
+import json
+import sys
+import urllib.parse
+
+profile = {
+    "UserProfileVersion": 2,
+    "RevisionNumber": 864,
+    "Cups": [{"id": 1}],
+    "Races": [1, 2, 3],
+    "NumberOfTokens": 10693,
+    "UnlockedFullGame": True,
+    "UnlockedProducts": [],
+}
+escaped = urllib.parse.quote(json.dumps(profile, separators=(",", ":")), safe="")
+with open(sys.argv[1], "w", encoding="utf-8") as stream:
+    stream.write("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n")
+    stream.write('    <int name="__UNITY_PLAYERPREFS_VERSION__" value="1" />\n')
+    stream.write('    <int name="Screenmanager%20Resolution%20Width" value="1280" />\n')
+    stream.write(f'    <string name="user_profile">{escaped}</string>\n')
+    stream.write("</map>\n")
+PY
+python3 "$IMPORTER" --auto -g "$ESCAPED" >/dev/null ||
+  fail "the importer refused a profile in the device's own escaped form"
+[ "$(profile_field "$ESCAPED/userdata/shared_prefs.bin" UnlockedFullGame)" = True ] ||
+  fail "the escaped profile did not carry its purchase through the import"
+python3 - "$PROJECT_ROOT" "$ESCAPED" <<'PY'
+import json
+import sys
+import urllib.parse
+import xml.etree.ElementTree as ET
+
+sys.path.insert(0, f"{sys.argv[1]}/tools")
+from import_android_save import profile_json, profile_text, read_prefs
+
+game = sys.argv[2]
+source = f"{game}/userdata/save-imports/com.aquiris.horizonchase.v2.playerprefs.xml"
+phone = {node.get("name"): node.text for node in ET.parse(source).getroot()}
+stored = read_prefs(f"{game}/userdata/shared_prefs.bin")["user_profile"].sval
+
+# The game reads user_profile as bare JSON, so escaped bytes kept verbatim
+# would start it on a fresh demo profile (the 1.2.1-teste failure).
+if not stored.startswith("{"):
+    raise SystemExit(f"the stored profile is not bare JSON: {stored[:16]}")
+if json.loads(stored) != json.loads(urllib.parse.unquote(phone["user_profile"])):
+    raise SystemExit("the decoded profile does not match what the phone carried")
+
+# Rewrites (bench, dev_unlock) must land plain too, whatever they read.
+if not profile_text(profile_json(stored)).startswith("{"):
+    raise SystemExit("a rewritten profile came back escaped")
+if not profile_text(profile_json(phone["user_profile"])).startswith("{"):
+    raise SystemExit("an escaped profile was not decoded on rewrite")
 PY
 
 # --- limits prefs_load() enforces --------------------------------------------

@@ -31,6 +31,7 @@ import json
 import os
 import struct
 import sys
+import urllib.parse
 import xml.etree.ElementTree as ET
 
 MAGIC = b"HCPREF2\x00"
@@ -199,19 +200,61 @@ def in_profile_scope(key):
     resolution, quality, audio routing -- and would overwrite the settings the
     port tuned for the handheld.
     """
-    return key == PROFILE_KEY or key.startswith(PROFILE_KEY + "_")
+    return unescape_key(key) == PROFILE_KEY or key.startswith(PROFILE_KEY + "_")
+
+
+def unescape_key(key):
+    """The key as the profile system names it, whatever the spelling on disk."""
+    return urllib.parse.unquote(key) if "%" in key else key
+
+
+def profile_json(text):
+    """Parse the profile string, escaped or not.
+
+    Unity's PlayerPrefs v2 backend on the phone percent-escapes keys and
+    values before they reach SharedPreferences, so a profile pulled off a real
+    device arrives as `%7B%22UniqueUserID%22...` rather than as bare JSON.
+    The unescape on the way back is tied to the `__UNITY_PLAYERPREFS_VERSION__`
+    marker, which the import's scope filter drops on purpose -- and the port's
+    own storage is the plain v1 form anyway: the game reads and writes
+    `user_profile` as bare JSON there (the bench unlock always proved that
+    in-game).  So this reads through either spelling, and everything the port
+    writes is written PLAIN -- see profile_text().
+    """
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        if "%" not in text:
+            raise
+    return json.loads(urllib.parse.unquote(text))
+
+
+def profile_text(profile):
+    """Serialize a profile the way the port's game stores it: bare JSON."""
+    return json.dumps(profile, separators=(",", ":"))
+
+
+def find_profile_entry(entries):
+    """The profile entry, under whatever spelling the source used."""
+    entry = entries.get(PROFILE_KEY)
+    if entry is not None:
+        return entry
+    for key, candidate in entries.items():
+        if unescape_key(key) == PROFILE_KEY:
+            return candidate
+    return None
 
 
 def check_profile(entries, origin):
     """Refuse anything that is not a Horizon Chase profile."""
-    entry = entries.get(PROFILE_KEY)
+    entry = find_profile_entry(entries)
     if entry is None or not entry.sval:
         raise SaveError(
             f"{origin}: nao tem a chave '{PROFILE_KEY}' -- nao e um save do "
             "Horizon Chase (confira se puxou o playerprefs.xml certo)"
         )
     try:
-        profile = json.loads(entry.sval)
+        profile = profile_json(entry.sval)
     except json.JSONDecodeError as exc:
         raise SaveError(f"{origin}: '{PROFILE_KEY}' nao e JSON valido ({exc})")
     if not isinstance(profile, dict):
@@ -311,6 +354,18 @@ def apply_import(gamedir, incoming, take_all, prefix="[import]"):
     }
     if not selected:
         raise SaveError("nada a importar depois do filtro de escopo")
+    # The phone stores these percent-escaped (PlayerPrefs v2); the port's game
+    # reads them plain (v1).  Land them in the form the game actually reads.
+    for key, entry in selected.items():
+        if not (in_profile_scope(key) and entry.sval and "%" in entry.sval):
+            continue
+        plain = Entry()
+        if unescape_key(key) == PROFILE_KEY:
+            plain.set_string(profile_text(profile_json(entry.sval)))
+        else:
+            plain.set_string(urllib.parse.unquote(entry.sval))
+        selected[key] = plain
+    selected = {unescape_key(key): entry for key, entry in selected.items()}
     userdata = os.path.join(gamedir, "userdata")
     os.makedirs(userdata, exist_ok=True)
     dest = os.path.join(userdata, "shared_prefs.bin")
@@ -365,7 +420,12 @@ def looks_like_prefs(path):
         return False
     if path.lower().endswith(".json"):
         return b'"' + PROFILE_KEY.encode() + b'"' in head or head.lstrip()[:1] == b"{"
-    return b"<map" in head and PROFILE_KEY.encode() in head
+    if b"<map" not in head:
+        return False
+    # The key can arrive percent-escaped, like everything Unity's PlayerPrefs
+    # v2 backend writes.  Sniff both spellings.
+    escaped = urllib.parse.quote(PROFILE_KEY, safe="").encode()
+    return PROFILE_KEY.encode() in head or escaped in head
 
 
 def auto_candidates(gamedir):
