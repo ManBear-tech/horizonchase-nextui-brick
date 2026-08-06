@@ -320,6 +320,112 @@ if MAGIC != b"HCPREF2\x00":
     raise SystemExit(f"magic drifted: {MAGIC!r}")
 PY
 
+# --- the phone's control scheme must never ride in with the profile ----------
+# The profile also stores WHICH scheme the player drives with (InputType ->
+# Horizon's EInputType). Anything under 7 steers by touchscreen or by tilting
+# the phone, which no handheld running this port has: the pad still drives the
+# menus (they come through the port's GamepadInputSource hooks) but the car
+# stops answering DURING THE RACE. The port's own profile sits on 12
+# (AndroidRemoteAutoAccelerate1 = physical pad), so the scheme is device-local
+# exactly like resolution and audio routing.
+INPUT="$TEST_ROOT/inputtype"
+mkdir -p "$INPUT/gamedata" "$INPUT/userdata"
+write_profile() {
+  # write_profile <shared_prefs.bin> <InputType|none>
+  python3 - "$PROJECT_ROOT" "$1" "$2" <<'PY'
+import json
+import sys
+
+sys.path.insert(0, f"{sys.argv[1]}/tools")
+from import_android_save import Entry, PROFILE_KEY, write_prefs
+
+profile = {"UserProfileVersion": 2, "RevisionNumber": 7, "Cups": [], "Races": [],
+           "NumberOfTokens": 5}
+if sys.argv[3] != "none":
+    profile["InputType"] = int(sys.argv[3])
+entry = Entry()
+entry.set_string(json.dumps(profile, separators=(",", ":")))
+write_prefs(sys.argv[2], {PROFILE_KEY: entry})
+PY
+}
+write_phone_profile() {
+  # write_phone_profile <xml> <InputType>
+  python3 - "$1" "$2" <<'PY'
+import json
+import sys
+import xml.sax.saxutils as escaping
+
+profile = {"UserProfileVersion": 2, "RevisionNumber": 99, "Cups": [{"id": 1}],
+           "Races": [1], "NumberOfTokens": 62, "UnlockedFullGame": True,
+           "UnlockedProducts": ["full_game"], "InputType": int(sys.argv[2])}
+with open(sys.argv[1], "w", encoding="utf-8") as stream:
+    stream.write('<?xml version="1.0" encoding="utf-8"?>\n<map>\n')
+    stream.write('<string name="user_profile">'
+                 f'{escaping.escape(json.dumps(profile))}</string>\n</map>\n')
+PY
+}
+
+# The import keeps the scheme the port was already on, and brings everything
+# else -- progress and entitlement -- across untouched.
+write_profile "$INPUT/userdata/shared_prefs.bin" 12
+write_phone_profile "$INPUT/gamedata/com.aquiris.horizonchase.v2.playerprefs.xml" 2
+python3 "$IMPORTER" --auto -g "$INPUT" >/dev/null
+[[ "$(profile_field "$INPUT/userdata/shared_prefs.bin" InputType)" == "12" ]] ||
+  fail "the phone's touch scheme overwrote the port's pad scheme"
+[[ "$(profile_field "$INPUT/userdata/shared_prefs.bin" UnlockedFullGame)" == "True" ]] ||
+  fail "healing the control scheme dropped the profile's purchase"
+[[ "$(profile_field "$INPUT/userdata/shared_prefs.bin" RevisionNumber)" == "99" ]] ||
+  fail "healing the control scheme dropped the imported progress"
+
+# A pad scheme the player picked in the game's own options is left alone.
+FRESH="$TEST_ROOT/inputkeep"
+mkdir -p "$FRESH/gamedata" "$FRESH/userdata"
+write_profile "$FRESH/userdata/shared_prefs.bin" 11
+write_phone_profile "$FRESH/gamedata/com.aquiris.horizonchase.v2.playerprefs.xml" 5
+python3 "$IMPORTER" --auto -g "$FRESH" >/dev/null
+[[ "$(profile_field "$FRESH/userdata/shared_prefs.bin" InputType)" == "11" ]] ||
+  fail "the player's own pad layout was replaced on import"
+
+# Importing into a fresh install still lands on a pad scheme.
+BLANK="$TEST_ROOT/inputblank"
+mkdir -p "$BLANK/gamedata"
+write_phone_profile "$BLANK/gamedata/com.aquiris.horizonchase.v2.playerprefs.xml" 2
+python3 "$IMPORTER" --auto -g "$BLANK" >/dev/null
+[[ "$(profile_field "$BLANK/userdata/shared_prefs.bin" InputType)" == "12" ]] ||
+  fail "a fresh install imported the phone's touch scheme"
+
+# An install ALREADY broken by an older import cannot be fixed by importing
+# again -- the source was consumed. The launcher heals it on the next start.
+BROKEN="$TEST_ROOT/inputheal"
+mkdir -p "$BROKEN/gamedata" "$BROKEN/userdata"
+write_profile "$BROKEN/userdata/shared_prefs.bin" 2
+python3 "$IMPORTER" --auto -g "$BROKEN" >/dev/null
+[[ "$(profile_field "$BROKEN/userdata/shared_prefs.bin" InputType)" == "12" ]] ||
+  fail "the launcher did not heal an install left on the phone's touch scheme"
+[[ "$(profile_field "$BROKEN/userdata/shared_prefs.bin" NumberOfTokens)" == "5" ]] ||
+  fail "healing an installed profile disturbed the save"
+
+# A healthy install must stay silent and untouched on every launch.
+before=$(md5sum < "$BROKEN/userdata/shared_prefs.bin")
+output=$(python3 "$IMPORTER" --auto -g "$BROKEN" 2>&1)
+[[ -z "$output" ]] || fail "the control-scheme check was not quiet: $output"
+[[ "$(md5sum < "$BROKEN/userdata/shared_prefs.bin")" == "$before" ]] ||
+  fail "a healthy save was rewritten on launch"
+
+# A profile with no InputType at all is left for the game to decide, which is
+# how every install before the import feature ended up on a working scheme.
+NOKEY="$TEST_ROOT/inputnone"
+mkdir -p "$NOKEY/gamedata" "$NOKEY/userdata"
+write_profile "$NOKEY/userdata/shared_prefs.bin" none
+python3 "$IMPORTER" --auto -g "$NOKEY" >/dev/null
+[[ "$(profile_field "$NOKEY/userdata/shared_prefs.bin" InputType)" == "None" ]] ||
+  fail "an InputType was invented for a profile that had none"
+
+# The launcher has to run this on every start, not only when a profile is
+# dropped, or an install broken by 1.1.0-beta/1.2.x never heals.
+grep -q 'import_android_save.py" --auto' "$PROJECT_ROOT/run.sh" ||
+  fail "run.sh no longer runs the importer on every launch"
+
 # --- the bench unlock must be unable to reach a release ----------------------
 grep -q 'dev_unlock' "$PROJECT_ROOT/package/universal/package-files.txt" &&
   fail "the bench unlock tool is listed in the release allowlist"

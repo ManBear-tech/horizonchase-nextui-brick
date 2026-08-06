@@ -230,6 +230,13 @@ Only the profile itself is imported. The rest of a phone's SharedPreferences
 describes that phone — resolution, quality, audio routing — and would override
 the settings tuned for the handheld.
 
+The control scheme is treated the same way. The profile also stores which
+scheme the player drives with, and a phone profile carries a touch or tilt
+one: taking it would leave the menus working (they come through the port's
+gamepad hooks) while the car stopped answering the pad during the race. The
+import keeps whatever scheme the port was already on, and an install left on
+a touch scheme by an earlier version is repaired on the next launch.
+
 The file is accepted exactly as the device writes it. Unity's PlayerPrefs v2
 backend on the phone percent-escapes keys and values before they reach
 SharedPreferences, so a real profile arrives as `%7B%22UniqueUserID%22...`
@@ -522,6 +529,13 @@ sobrescreveria com o perfil velho do celular o progresso feito no aparelho.
 Só o perfil é importado. O resto das SharedPreferences descreve aquele celular
 — resolução, qualidade, rota de áudio — e passaria por cima dos ajustes
 calibrados para o portátil.
+
+O esquema de controle entra na mesma regra. O perfil também guarda com o que
+o jogador dirige, e um perfil de celular carrega toque ou inclinação: trazer
+esse valor deixava os menus funcionando (eles passam pelos hooks de controle
+do port) enquanto o carro parava de responder ao controle na corrida. A
+importação mantém o esquema que o port já usava, e um install deixado no
+esquema de toque por uma versão anterior é consertado na abertura seguinte.
 
 O arquivo é aceito do jeito que o aparelho grava. O backend PlayerPrefs v2 da
 Unity no celular escapa chaves e valores em porcentagem antes de chegarem ao

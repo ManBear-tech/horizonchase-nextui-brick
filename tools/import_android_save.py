@@ -234,6 +234,119 @@ def profile_text(profile):
     return json.dumps(profile, separators=(",", ":"))
 
 
+# The profile also carries WHICH control scheme the player uses -- the phone's
+# one.  `InputType` indexes Horizon's own EInputType (read out of the game's
+# global-metadata):
+#
+#   0 Classic1  1 Classic2  2 AutoAccelerate1  3 AutoAccelerate2
+#   4 AutoAccelerate3  5 Tilt1  6 Tilt2  7 Controller
+#   8 AppleRemoteTilt2  9 AppleRemoteTilt1  10 AppleRemoteAutoAccelerate1
+#   11 AndroidRemoteClassic1  12 AndroidRemoteAutoAccelerate1
+#   13 AndroidRemoteAutoAccelerate2
+#
+# Everything below 7 steers by touching the screen or by tilting the phone --
+# hardware no handheld running this port has.  The port's own profile, made on
+# the R36S, sits on 12 (Android remote = physical pad).  Importing a phone
+# profile used to drop the phone's value straight in, so a purchased profile
+# landed on AutoAccelerate1 and the car stopped answering the pad DURING THE
+# RACE while the menus kept working -- the menus come through the port's
+# GamepadInputSource hooks, the car does not.
+#
+# So the scheme is device-local, exactly like resolution and audio routing:
+# the import never takes it from the phone, and a profile already carrying an
+# untouchable scheme is healed on launch.  Nothing else in the profile is
+# rewritten -- progress and entitlements come across verbatim.
+INPUT_TYPE_KEY = "InputType"
+PAD_INPUT_TYPES = (7, 11, 12, 13)
+PORT_INPUT_TYPE = 12
+INPUT_TYPE_NAMES = {
+    0: "Classic1 (toque)", 1: "Classic2 (toque)",
+    2: "AutoAccelerate1 (toque)", 3: "AutoAccelerate2 (toque)",
+    4: "AutoAccelerate3 (toque)", 5: "Tilt1 (inclinacao)",
+    6: "Tilt2 (inclinacao)", 7: "Controller",
+    8: "AppleRemoteTilt2", 9: "AppleRemoteTilt1",
+    10: "AppleRemoteAutoAccelerate1", 11: "AndroidRemoteClassic1",
+    12: "AndroidRemoteAutoAccelerate1", 13: "AndroidRemoteAutoAccelerate2",
+}
+
+
+def input_type_name(value):
+    return INPUT_TYPE_NAMES.get(value, f"desconhecido ({value})")
+
+
+def playable_input_type(profile):
+    """The scheme in this profile, if it is one a pad can drive."""
+    value = profile.get(INPUT_TYPE_KEY)
+    return value if isinstance(value, int) and value in PAD_INPUT_TYPES else None
+
+
+def heal_input_type(profile, keep=None, prefix="[save]"):
+    """Force a pad-drivable control scheme. Returns True if it changed.
+
+    `keep` is the scheme the port was already using (the local profile's), so
+    a player who picked a different pad layout in the game's own options keeps
+    it.  A profile with no InputType at all is left alone: the game picks the
+    scheme itself for a fresh profile, which is how every install before the
+    import feature ended up on a working one.
+    """
+    current = profile.get(INPUT_TYPE_KEY)
+    if not isinstance(current, int) or current in PAD_INPUT_TYPES:
+        return False
+    wanted = keep if keep in PAD_INPUT_TYPES else PORT_INPUT_TYPE
+    profile[INPUT_TYPE_KEY] = wanted
+    print(
+        f"{prefix} controle: perfil vinha em {input_type_name(current)}, "
+        f"que so funciona com tela/sensor -- ajustado para "
+        f"{input_type_name(wanted)}"
+    )
+    return True
+
+
+def stored_profile(entries):
+    """The profile already in the port's prefs, parsed, or None."""
+    entry = find_profile_entry(entries)
+    if entry is None or not entry.sval:
+        return None
+    try:
+        profile = profile_json(entry.sval)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return profile if isinstance(profile, dict) else None
+
+
+def heal_stored_input_type(gamedir, prefix="[save]"):
+    """Repair an install whose stored profile carries a touch/tilt scheme.
+
+    The import consumes its source file, so an install already broken by an
+    earlier import cannot be fixed by importing again -- the launcher runs
+    this on every start instead.  It writes only when there is something to
+    fix, and touches nothing but InputType.
+    """
+    dest = os.path.join(gamedir, "userdata", "shared_prefs.bin")
+    try:
+        entries = read_prefs(dest)
+    except (SaveError, OSError):
+        return False
+    profile = stored_profile(entries)
+    if profile is None or not heal_input_type(profile, prefix=prefix):
+        return False
+    healed = Entry()
+    healed.set_string(profile_text(profile))
+    entries[find_profile_key(entries)] = healed
+    write_prefs(dest, entries)
+    return True
+
+
+def find_profile_key(entries):
+    """The key the profile is stored under, whatever the spelling."""
+    if PROFILE_KEY in entries:
+        return PROFILE_KEY
+    for key in entries:
+        if unescape_key(key) == PROFILE_KEY:
+            return key
+    return PROFILE_KEY
+
+
 def find_profile_entry(entries):
     """The profile entry, under whatever spelling the source used."""
     entry = entries.get(PROFILE_KEY)
@@ -370,6 +483,22 @@ def apply_import(gamedir, incoming, take_all, prefix="[import]"):
     os.makedirs(userdata, exist_ok=True)
     dest = os.path.join(userdata, "shared_prefs.bin")
     merged = read_prefs(dest)
+    # The control scheme belongs to this handheld, not to the phone the
+    # profile came from: keep whatever the port was already using and never
+    # let a touch/tilt scheme ride in with the progress.
+    local = stored_profile(merged)
+    keep = playable_input_type(local) if local else None
+    profile_key = find_profile_key(selected)
+    incoming_entry = selected.get(profile_key)
+    if incoming_entry is not None and incoming_entry.sval:
+        try:
+            profile = profile_json(incoming_entry.sval)
+        except (json.JSONDecodeError, ValueError):
+            profile = None
+        if isinstance(profile, dict) and heal_input_type(profile, keep, prefix):
+            fixed = Entry()
+            fixed.set_string(profile_text(profile))
+            selected[profile_key] = fixed
     if merged:
         backup = dest + ".bak"
         with open(dest, "rb") as source, open(backup, "wb") as target:
@@ -447,10 +576,7 @@ def auto_candidates(gamedir):
 
 def run_auto(gamedir, take_all):
     """Launcher path: import whatever the player dropped, never break boot."""
-    candidates = auto_candidates(gamedir)
-    if not candidates:
-        return 0
-    for source in candidates:
+    for source in auto_candidates(gamedir):
         name = os.path.basename(source)
         try:
             incoming = read_source(source)
@@ -464,6 +590,14 @@ def run_auto(gamedir, take_all):
             print(f"[save] ignorado: {exc}", file=sys.stderr)
         except OSError as exc:
             print(f"[save] falha de E/S em {name}: {exc}", file=sys.stderr)
+    # An install imported by an older version may still be sitting on the
+    # phone's touch scheme with its source already consumed, so the scheme is
+    # checked on every launch and not only when something is dropped.  A save
+    # already on a pad scheme is not rewritten and says nothing.
+    try:
+        heal_stored_input_type(gamedir)
+    except (SaveError, OSError) as exc:
+        print(f"[save] ajuste de controle ignorado: {exc}", file=sys.stderr)
     return 0
 
 
@@ -491,8 +625,20 @@ def main():
         "--auto", action="store_true",
         help=f"varre {DROP_DIR}/ e importa o que achar (usado pelo launcher)",
     )
+    parser.add_argument(
+        "--heal-input", action="store_true",
+        help="so conserta o esquema de controle do save ja instalado",
+    )
     args = parser.parse_args()
 
+    if args.heal_input:
+        try:
+            if not heal_stored_input_type(args.gamedir, prefix="[save]"):
+                print("[save] esquema de controle ja esta ok")
+        except (SaveError, OSError) as exc:
+            print(f"erro: {exc}", file=sys.stderr)
+            return 1
+        return 0
     if args.auto:
         if args.source:
             parser.error("--auto nao aceita uma origem explicita")

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.2.2
+
+- Conserta o controle que parava de funcionar DENTRO DA CORRIDA depois de
+  importar o perfil do Android (menus continuavam respondendo). O perfil
+  guarda também o esquema de controle do celular, no campo `InputType`, que
+  indexa o `EInputType` do próprio jogo: tudo abaixo de 7 dirige por toque na
+  tela ou inclinando o aparelho. A importação levava esse valor junto com o
+  progresso, então um perfil comprado caía em `AutoAccelerate1` (toque) e o
+  carro deixava de responder ao controle — os menus seguiam funcionando
+  porque passam pelos hooks de `GamepadInputSource` do port, e o carro não.
+- O esquema de controle agora é do aparelho, igual à resolução e ao áudio: a
+  importação mantém o que o port já usava (o R36S fica em
+  `AndroidRemoteAutoAccelerate1`) e nunca traz o do celular. Progresso,
+  compra e DLC continuam vindo intactos.
+- Quem já importou numa versão anterior não consegue consertar reimportando —
+  o arquivo de origem é consumido no primeiro uso. Por isso o launcher
+  confere o esquema em toda abertura e conserta o save instalado uma vez,
+  sem tocar em mais nada. Save já num esquema de controle não é reescrito e
+  não imprime nada.
+
 ## 1.2.1
 
 - Aceita o perfil do Android no formato que o aparelho realmente grava. O
