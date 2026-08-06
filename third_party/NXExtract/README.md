@@ -43,7 +43,7 @@ cd NXExtract
   KMSDRM 640×480. A carga exibida é 100% sintética.</sub>
 </p>
 
-## Apoie e participe
+## Participe
 
 Este projeto é livre sob MIT. Código, testes de novos aparelhos, receitas
 sintéticas e documentação são bem-vindos:
@@ -51,10 +51,7 @@ sintéticas e documentação são bem-vindos:
 - 🐛 **Bugs e propostas**: [GitHub Issues](https://github.com/NextOs-Ports/NXExtract/issues);
 - 🔀 **Código**: [Pull Requests](https://github.com/NextOs-Ports/NXExtract/pulls) e
   [guia de contribuição](CONTRIBUTING.md);
-- 💬 **Comunidade**: [Discord NextOS](https://discord.gg/DHfY62eDNN);
-- 💗 **GitHub Sponsors**: [github.com/sponsors/NextOs-Ports](https://github.com/sponsors/NextOs-Ports);
-- ☕ **Ko-fi**: [ko-fi.com/nextos](https://ko-fi.com/nextos);
-- 🇧🇷 **PIX**: [livepix.gg/nextos](https://livepix.gg/nextos).
+- 💬 **Comunidade**: [Discord NextOS](https://discord.gg/DHfY62eDNN).
 
 O nome externo do arquivo nunca identifica o jogo. `sonic.apk`, `bully.apkm` ou qualquer
 outro nome são apenas nomes: o extrator abre o conteúdo, reconhece a estrutura e só aceita
