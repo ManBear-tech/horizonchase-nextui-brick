@@ -3,7 +3,9 @@
 
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 
-if [ -d /opt/system/Tools/PortMaster ]; then
+if [ -n "${HC_CONTROLFOLDER:-}" ]; then
+  controlfolder=$HC_CONTROLFOLDER
+elif [ -d /opt/system/Tools/PortMaster ]; then
   controlfolder=/opt/system/Tools/PortMaster
 elif [ -d /opt/tools/PortMaster ]; then
   controlfolder=/opt/tools/PortMaster
@@ -27,7 +29,9 @@ declare -F get_controls >/dev/null 2>&1 && get_controls
 : "${CUR_TTY:=/dev/tty0}"
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P) || exit 1
-if [ -n "${directory:-}" ]; then
+if [ -n "${HC_GAMEDIR:-}" ]; then
+  GAMEDIR=$HC_GAMEDIR
+elif [ -n "${directory:-}" ]; then
   GAMEDIR="/${directory#/}/ports/horizonchase"
 else
   GAMEDIR="$SCRIPT_DIR/horizonchase"
@@ -190,6 +194,17 @@ printf '[launcher] runtime data gate OK\n'
 # skip the adaptive memory, texture, audio and controller environment.
 "$GAMEDIR/run.sh"
 status=$?
+
+# A device launcher can pin a physical-pad scheme without editing the user's
+# save by hand. A fresh profile does not exist before the first game run, so
+# perform the same narrowly scoped heal once more after a clean return.
+if [ -n "${HC_FORCE_INPUT_TYPE:-}" ] &&
+   [ -r "$GAMEDIR/tools/import_android_save.py" ] &&
+   command -v python3 >/dev/null 2>&1; then
+  python3 "$GAMEDIR/tools/import_android_save.py" \
+    --heal-input -g "$GAMEDIR" ||
+    echo "[save] post-run control adjustment ignored (status $?)"
+fi
 
 ${ESUDO:-} chmod 666 "$CUR_TTY" 2>/dev/null || true
 printf '\033c' >> "$CUR_TTY" 2>/dev/null || true

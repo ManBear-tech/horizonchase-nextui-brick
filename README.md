@@ -1,8 +1,8 @@
-# Horizon Chase 2.6.9 — universal AArch64 Unity/IL2CPP port
+# Horizon Chase 2.6.9 for TrimUI Brick / NextUI
 
-[![CI](https://github.com/NextOs-Ports/horizonchase-nextos/actions/workflows/ci.yml/badge.svg)](https://github.com/NextOs-Ports/horizonchase-nextos/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/NextOs-Ports/horizonchase-nextos)](https://github.com/NextOs-Ports/horizonchase-nextos/releases/latest)
-[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](https://github.com/NextOs-Ports/horizonchase-nextos/blob/main/LICENSE)
+[![CI](https://github.com/ManBear-tech/horizonchase-nextui-brick/actions/workflows/ci.yml/badge.svg)](https://github.com/ManBear-tech/horizonchase-nextui-brick/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ManBear-tech/horizonchase-nextui-brick)](https://github.com/ManBear-tech/horizonchase-nextui-brick/releases/latest)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
 **Language / Idioma:** [English](#english) · [Português](#português)
 
@@ -10,7 +10,118 @@ This project is an independent compatibility loader. It does not distribute
 Horizon Chase's APK, Unity/IL2CPP libraries, art, music or any other
 proprietary game data.
 
-[Download the latest PortMaster package / Baixar o pacote PortMaster](https://github.com/NextOs-Ports/horizonchase-nextos/releases/latest)
+[Download the latest TrimUI Brick package](https://github.com/ManBear-tech/horizonchase-nextui-brick/releases/latest)
+
+This fork packages the upstream
+[`NextOs-Ports/horizonchase-nextos`](https://github.com/NextOs-Ports/horizonchase-nextos)
+loader specifically for a TrimUI Brick running NextUI. It adds the tested
+PowerVR presentation fix, manual bottom-face-button acceleration, the exact
+NextUI filesystem layout, and a 60 FPS lifecycle target.
+
+## TrimUI Brick quick start
+
+### Requirements
+
+- TrimUI Brick running NextUI with the PortMaster runtime available.
+- A legally obtained **ARM64 Android Horizon Chase 2.6.9** APK, or a complete
+  APKS/APKM/XAPK containing every required split.
+- The release ZIP from this repository.
+
+The release contains only the open-source compatibility loader and
+redistributable support files. It deliberately contains no APK, Unity game
+libraries, tracks, textures, music, profile, or purchase entitlement.
+
+### Fresh install
+
+1. Extract `horizonchase-nextui-brick.zip` directly into:
+
+   ```text
+   /mnt/SDCARD/Roms/Ports (PORTS)
+   ```
+
+2. Confirm that extraction produced both of these paths:
+
+   ```text
+   /mnt/SDCARD/Roms/Ports (PORTS)/Horizon Chase.sh
+   /mnt/SDCARD/Roms/Ports (PORTS)/.ports/horizonchase/horizonchase
+   ```
+
+3. Copy your owned Android package or package bundle into:
+
+   ```text
+   /mnt/SDCARD/Roms/Ports (PORTS)/.ports/horizonchase/gamedata
+   ```
+
+4. Launch **Horizon Chase** from NextUI. NXExtract validates version 2.6.9,
+   extracts the required owner-supplied game data, and then starts the game.
+
+Do **not** replace the executable after NXExtract runs. The release installs
+the patched executable from the beginning; NXExtract does not overwrite it.
+It only prepares proprietary files supplied by the owner, such as
+`libunity.so`, `libil2cpp.so`, metadata, Android assets, and the Unity asset
+pack.
+
+On a completely new save, quit normally after the first launch and open the
+game again. The post-run save healer will have selected manual scheme 11.
+Existing installs are corrected before the game starts.
+
+### Updating an existing horizonchase-nextos install
+
+1. Exit Horizon Chase completely and back up the existing
+   `.ports/horizonchase` directory.
+2. Extract this release over `/mnt/SDCARD/Roms/Ports (PORTS)` and allow it to
+   replace the public launcher/runtime files.
+3. Keep your existing extracted game data and `userdata` directory. NXExtract
+   validates them on launch; a second extraction is normally unnecessary.
+
+The release archive never contains or intentionally replaces personal saves
+with a bundled save.
+
+### Paths expected by the launcher
+
+| Purpose | Path |
+|---|---|
+| NextUI Ports root | `/mnt/SDCARD/Roms/Ports (PORTS)` |
+| Hidden game directory (`GAMEDIR`) | `/mnt/SDCARD/Roms/Ports (PORTS)/.ports/horizonchase` |
+| Owner-supplied APK/APKM/APKS/XAPK | `$GAMEDIR/gamedata` |
+| Save and generated user data | `$GAMEDIR/userdata` |
+| Debug log | `$GAMEDIR/debug.log` |
+| NextUI PortMaster controls/runtime | `/mnt/SDCARD/Emus/tg5040/PORTS.pak/PortMaster` |
+
+The menu launcher hardcodes the two NextUI paths above by default. Advanced
+users launching it from a shell can override them with `HC_GAMEDIR` and
+`HC_CONTROLFOLDER`, or change the Ports root with `HC_NEXTUI_PORTS_ROOT`.
+
+### Brick-specific behavior
+
+- `HC_PURE_SDL_CONTEXTS=1` is required. NextUI names its SDL video backend
+  `mali`, but the Brick used for validation reports a PowerVR Rogue GE8300.
+  SDL must retain EGL-context ownership for working presentation.
+- The loader repairs default-backbuffer alpha immediately before SDL swaps.
+  This fixes the road being invisible during a race but visible while paused.
+- `HC_FRAME_LIMIT=60` changes Unity's lifecycle cadence, not game time scale;
+  gameplay physics and speed are not doubled. Set `HC_FRAME_LIMIT=30` in the
+  launcher if you want the upstream cadence or are investigating stability.
+- `HC_FORCE_INPUT_TYPE=11` selects manual acceleration. The patched loader
+  maps forward to the bottom Xbox-layout face button and leaves D-pad Down as
+  brake.
+- `HC_GLSTATE_TRACE` is diagnostic-only and is explicitly disabled by the
+  packaged launcher. It is not required for the road fix.
+- `HC_NO_OPAQUE_BACKBUFFER` and `HC_GLES_MAJOR` are explicitly unset because
+  the earlier experiments interfere with or do not help this PowerVR path.
+
+Validated on a TrimUI Brick at 1024×768 under NextUI with a PowerVR Rogue
+GE8300: title, menus, complete race, road rendering, music/SFX, manual input,
+pause/resume, persistent save, and sustained approximately 60 FPS. A single
+frontend reboot was observed once but did not recur in the following complete
+race; use the 30 FPS fallback and attach both logs when reporting any repeatable
+crash.
+
+## Upstream project documentation
+
+The remaining documentation describes the universal upstream loader and its
+other supported firmware/device paths. Brick users should follow the install
+layout above rather than the generic `horizonchase/` layout below.
 
 ## Community
 

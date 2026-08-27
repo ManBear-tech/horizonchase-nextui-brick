@@ -280,7 +280,30 @@ def playable_input_type(profile):
     return value if isinstance(value, int) and value in PAD_INPUT_TYPES else None
 
 
-def heal_input_type(profile, keep=None, prefix="[save]"):
+def forced_input_type_from_env(prefix="[save]"):
+    """Return the launcher-requested pad scheme, or None when unset/invalid."""
+    raw = os.environ.get("HC_FORCE_INPUT_TYPE", "").strip()
+    if not raw:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        print(
+            f"{prefix} HC_FORCE_INPUT_TYPE={raw!r} ignorado (nao e inteiro)",
+            file=sys.stderr,
+        )
+        return None
+    if value not in PAD_INPUT_TYPES:
+        print(
+            f"{prefix} HC_FORCE_INPUT_TYPE={value} ignorado "
+            f"(esquema sem controle fisico)",
+            file=sys.stderr,
+        )
+        return None
+    return value
+
+
+def heal_input_type(profile, keep=None, prefix="[save]", force=None):
     """Force a pad-drivable control scheme. Returns True if it changed.
 
     `keep` is the scheme the port was already using (the local profile's), so
@@ -290,13 +313,18 @@ def heal_input_type(profile, keep=None, prefix="[save]"):
     import feature ended up on a working one.
     """
     current = profile.get(INPUT_TYPE_KEY)
-    if not isinstance(current, int) or current in PAD_INPUT_TYPES:
+    if not isinstance(current, int):
         return False
-    wanted = keep if keep in PAD_INPUT_TYPES else PORT_INPUT_TYPE
+    wanted = (
+        force if force in PAD_INPUT_TYPES
+        else keep if keep in PAD_INPUT_TYPES
+        else PORT_INPUT_TYPE
+    )
+    if current == wanted or (current in PAD_INPUT_TYPES and force is None):
+        return False
     profile[INPUT_TYPE_KEY] = wanted
     print(
-        f"{prefix} controle: perfil vinha em {input_type_name(current)}, "
-        f"que so funciona com tela/sensor -- ajustado para "
+        f"{prefix} controle: {input_type_name(current)} -> "
         f"{input_type_name(wanted)}"
     )
     return True
@@ -314,7 +342,7 @@ def stored_profile(entries):
     return profile if isinstance(profile, dict) else None
 
 
-def heal_stored_input_type(gamedir, prefix="[save]"):
+def heal_stored_input_type(gamedir, prefix="[save]", force=None):
     """Repair an install whose stored profile carries a touch/tilt scheme.
 
     The import consumes its source file, so an install already broken by an
@@ -328,7 +356,9 @@ def heal_stored_input_type(gamedir, prefix="[save]"):
     except (SaveError, OSError):
         return False
     profile = stored_profile(entries)
-    if profile is None or not heal_input_type(profile, prefix=prefix):
+    if profile is None or not heal_input_type(
+        profile, prefix=prefix, force=force
+    ):
         return False
     healed = Entry()
     healed.set_string(profile_text(profile))
@@ -459,7 +489,9 @@ def describe(profile, prefix="[import]"):
     return full or bool(products)
 
 
-def apply_import(gamedir, incoming, take_all, prefix="[import]"):
+def apply_import(
+    gamedir, incoming, take_all, prefix="[import]", force_input_type=None
+):
     """Merge the selected keys into the port's prefs. Returns keys written."""
     selected = {
         key: entry for key, entry in incoming.items()
@@ -495,7 +527,9 @@ def apply_import(gamedir, incoming, take_all, prefix="[import]"):
             profile = profile_json(incoming_entry.sval)
         except (json.JSONDecodeError, ValueError):
             profile = None
-        if isinstance(profile, dict) and heal_input_type(profile, keep, prefix):
+        if isinstance(profile, dict) and heal_input_type(
+            profile, keep, prefix, force_input_type
+        ):
             fixed = Entry()
             fixed.set_string(profile_text(profile))
             selected[profile_key] = fixed
@@ -576,6 +610,7 @@ def auto_candidates(gamedir):
 
 def run_auto(gamedir, take_all):
     """Launcher path: import whatever the player dropped, never break boot."""
+    force_input_type = forced_input_type_from_env()
     for source in auto_candidates(gamedir):
         name = os.path.basename(source)
         try:
@@ -583,7 +618,10 @@ def run_auto(gamedir, take_all):
             profile = check_profile(incoming, name)
             print(f"[save] perfil Android encontrado em {DROP_DIR}/{name}")
             describe(profile, prefix="[save]")
-            apply_import(gamedir, incoming, take_all, prefix="[save]")
+            apply_import(
+                gamedir, incoming, take_all, prefix="[save]",
+                force_input_type=force_input_type,
+            )
             archive_source(gamedir, source)
             print("[save] perfil importado; o progresso vale offline")
         except SaveError as exc:
@@ -595,7 +633,7 @@ def run_auto(gamedir, take_all):
     # checked on every launch and not only when something is dropped.  A save
     # already on a pad scheme is not rewritten and says nothing.
     try:
-        heal_stored_input_type(gamedir)
+        heal_stored_input_type(gamedir, force=force_input_type)
     except (SaveError, OSError) as exc:
         print(f"[save] ajuste de controle ignorado: {exc}", file=sys.stderr)
     return 0
@@ -633,7 +671,10 @@ def main():
 
     if args.heal_input:
         try:
-            if not heal_stored_input_type(args.gamedir, prefix="[save]"):
+            force_input_type = forced_input_type_from_env()
+            if not heal_stored_input_type(
+                args.gamedir, prefix="[save]", force=force_input_type
+            ):
                 print("[save] esquema de controle ja esta ok")
         except (SaveError, OSError) as exc:
             print(f"erro: {exc}", file=sys.stderr)
@@ -652,7 +693,10 @@ def main():
         describe(profile)
         if args.dry_run:
             return 0
-        apply_import(args.gamedir, incoming, args.take_all)
+        apply_import(
+            args.gamedir, incoming, args.take_all,
+            force_input_type=forced_input_type_from_env(prefix="[import]"),
+        )
     except SaveError as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 1

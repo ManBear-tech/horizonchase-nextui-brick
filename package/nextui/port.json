@@ -1,0 +1,36 @@
+{
+    "version": 4,
+    "name": "horizonchase-nextui-brick.zip",
+    "items": [
+        "Horizon Chase.sh",
+        ".ports/horizonchase"
+    ],
+    "items_opt": [],
+    "attr": {
+        "title": "Horizon Chase",
+        "porter": [
+            "NextOS",
+            "ManBear-tech"
+        ],
+        "desc": "Horizon Chase Android 2.6.9 compatibility loader for TrimUI Brick running NextUI. Includes the PowerVR SDL presentation fix, manual bottom-button acceleration, audio, persistent saves, and a 60 FPS lifecycle target. BYO-data; game files are not included.",
+        "inst": "Extract the ZIP into /mnt/SDCARD/Roms/Ports (PORTS), put a legal Horizon Chase Android 2.6.9 APK/APKM/APKS/XAPK and all required splits in .ports/horizonchase/gamedata, then launch Horizon Chase. NXExtract validates and prepares the owner-supplied data automatically.",
+        "genres": [
+            "racing",
+            "arcade"
+        ],
+        "image": {
+            "screenshot": "screenshot.png",
+            "covers": [
+                "cover.png"
+            ],
+            "thumbnail": "cover.png",
+            "video": null
+        },
+        "rtr": false,
+        "runtime": [],
+        "reqs": [],
+        "arch": [
+            "aarch64"
+        ]
+    }
+}

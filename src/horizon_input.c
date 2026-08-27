@@ -235,7 +235,13 @@ static float hc_horizontal(void *self, void *method_info) {
 static float hc_vertical(void *self, void *method_info) {
   (void)self;
   (void)method_info;
-  if (g_button[HC_UP]) return 1.0f;
+  /*
+   * AndroidRemoteClassic1 (InputType 11) drives through this vertical axis
+   * instead of get_IsAccelerationButtonPressed.  Preserve D-pad Up for
+   * remote-style pads, but also honor the Xbox A acceleration contract used
+   * everywhere else by this port.
+   */
+  if (g_button[HC_A] || g_button[HC_UP]) return 1.0f;
   if (g_button[HC_DOWN]) return -1.0f;
   return -hc_deadzone(g_axis[HC_LY]);
 }

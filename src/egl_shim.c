@@ -25,6 +25,9 @@
 #include "egl_shim.h"
 #include "util.h"
 
+/* Implemented by main.c; shared by raw-EGL and SDL-owned present paths. */
+extern void hc_opaque_backbuffer_before_present(void);
+
 static int g_screen_w = 1280;
 static int g_screen_h = 720;
 #define SCREEN_WIDTH g_screen_w
@@ -772,6 +775,7 @@ EGLBoolean egl_shim_SwapBuffers(EGLDisplay dpy, EGLSurface surface) {
 
   if (has_real_gl && (tls_is_window || (current_context && !current_context->is_pbuffer))) {
     { extern void ter_shot_hook(void); ter_shot_hook(); }  /* captura na thread DONA da window (antes do swap) */
+    hc_opaque_backbuffer_before_present();
     SDL_GL_SwapWindow(egl_window);
     int fc = ++frame_count;
     if (fc <= 10 || fc % 60 == 0) {

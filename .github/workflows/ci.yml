@@ -46,17 +46,25 @@ jobs:
       - name: Test launcher owner-data gate
         run: bash tests/launcher_data_gate_test.sh
 
+      - name: Test TrimUI Brick launcher environment
+        run: bash tests/nextui_launcher_test.sh
+
       - name: Test Android profile import
         run: bash tests/save_import_test.sh
 
       - name: Build and audit the BYO-data package
         run: ./package/build-portmaster-package.sh
 
+      - name: Build and audit the TrimUI Brick package
+        run: ./package/build-nextui-brick-package.sh
+
       - name: Record release hashes
         run: |
           sha256sum horizonchase-universal libastcUtil.so
           sha256sum package/dist/horizonchase.zip
           (cd package/dist && sha256sum -c horizonchase.zip.sha256)
+          sha256sum package/dist/horizonchase-nextui-brick.zip
+          (cd package/dist && sha256sum -c horizonchase-nextui-brick.zip.sha256)
 
       - uses: actions/upload-artifact@v4
         with:
@@ -64,4 +72,6 @@ jobs:
           path: |
             package/dist/horizonchase.zip
             package/dist/horizonchase.zip.sha256
+            package/dist/horizonchase-nextui-brick.zip
+            package/dist/horizonchase-nextui-brick.zip.sha256
           if-no-files-found: error

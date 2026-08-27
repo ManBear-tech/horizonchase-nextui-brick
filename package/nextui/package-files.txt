@@ -1,0 +1,27 @@
+.ports/horizonchase/CHANGELOG.md
+.ports/horizonchase/NOTICE.md
+.ports/horizonchase/PACKAGE-MANIFEST.sha256
+.ports/horizonchase/R36S-MIGRATION.md
+.ports/horizonchase/README.md
+.ports/horizonchase/cover.png
+.ports/horizonchase/extractor.json
+.ports/horizonchase/gamedata/README.txt
+.ports/horizonchase/gameinfo.xml
+.ports/horizonchase/horizonchase
+.ports/horizonchase/launcher-common.sh
+.ports/horizonchase/libastcUtil.so
+.ports/horizonchase/licenses/Apache-2.0.txt
+.ports/horizonchase/licenses/GPL-3.0.txt
+.ports/horizonchase/licenses/NXExtract-MIT.txt
+.ports/horizonchase/licenses/Producdevity-MIT.txt
+.ports/horizonchase/licenses/Unlicense.txt
+.ports/horizonchase/nxextract-ui
+.ports/horizonchase/nxextract.py
+.ports/horizonchase/port.json
+.ports/horizonchase/run-extractor.sh
+.ports/horizonchase/run.sh
+.ports/horizonchase/screenshot.png
+.ports/horizonchase/tools/build_unity_asset_pack.py
+.ports/horizonchase/tools/import_android_save.py
+.ports/horizonchase/version.txt
+Horizon Chase.sh

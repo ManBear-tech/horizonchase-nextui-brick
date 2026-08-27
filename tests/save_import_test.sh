@@ -412,6 +412,20 @@ output=$(python3 "$IMPORTER" --auto -g "$BROKEN" 2>&1)
 [[ "$(md5sum < "$BROKEN/userdata/shared_prefs.bin")" == "$before" ]] ||
   fail "a healthy save was rewritten on launch"
 
+# Device-specific launchers may pin one of the pad schemes. The TrimUI Brick
+# launcher uses manual AndroidRemoteClassic1 (11), whose forward axis is
+# bridged to the bottom face button by src/horizon_input.c.
+BRICK="$TEST_ROOT/inputbrick"
+mkdir -p "$BRICK/gamedata" "$BRICK/userdata"
+write_profile "$BRICK/userdata/shared_prefs.bin" 12
+HC_FORCE_INPUT_TYPE=11 python3 "$IMPORTER" --auto -g "$BRICK" >/dev/null
+[[ "$(profile_field "$BRICK/userdata/shared_prefs.bin" InputType)" == "11" ]] ||
+  fail "the Brick launcher override did not select the manual pad scheme"
+brick_before=$(md5sum < "$BRICK/userdata/shared_prefs.bin")
+HC_FORCE_INPUT_TYPE=11 python3 "$IMPORTER" --heal-input -g "$BRICK" >/dev/null
+[[ "$(md5sum < "$BRICK/userdata/shared_prefs.bin")" == "$brick_before" ]] ||
+  fail "the Brick control scheme was rewritten after it was already correct"
+
 # A profile with no InputType at all is left for the game to decide, which is
 # how every install before the import feature ended up on a working scheme.
 NOKEY="$TEST_ROOT/inputnone"

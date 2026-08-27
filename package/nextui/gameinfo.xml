@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<gameList>
+  <game>
+    <path>./Horizon Chase.sh</path>
+    <name>Horizon Chase</name>
+    <desc>Horizon Chase Android 2.6.9 compatibility loader for TrimUI Brick running NextUI. Uses the Brick's PowerVR GPU through SDL, targets 60 FPS, provides native controls, audio, persistent saves, and clean frontend return. Requires legally owned Android game data prepared automatically by NXExtract.</desc>
+    <image>./.ports/horizonchase/cover.png</image>
+    <developer>Aquiris Game Studio</developer>
+    <publisher>Aquiris Game Studio</publisher>
+    <genre>Racing / Arcade</genre>
+  </game>
+</gameList>
